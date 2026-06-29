@@ -5,10 +5,10 @@ import shutil
 import time
 from pathlib import Path
 
-from config import TMP_DIR
+from config import TMP_DIR, TMP_MAX_AGE_HOURS
 
 
-def cleanup_tmp(max_age_hours: int = 24) -> int:
+def cleanup_tmp(max_age_hours: int = TMP_MAX_AGE_HOURS) -> int:
     """Remove stale generated files from data/tmp and return removed item count."""
     TMP_DIR.mkdir(parents=True, exist_ok=True)
     cutoff = time.time() - max(1, max_age_hours) * 3600

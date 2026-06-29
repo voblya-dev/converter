@@ -7,6 +7,7 @@ from aiogram.types import Message, CallbackQuery
 
 from config import ADMIN_ID, BACKGROUNDS_DIR
 from utils import state, keyboards
+from utils.health import health_report
 from utils.i18n import t
 from utils.premium_emoji import premiumize_text
 
@@ -117,6 +118,18 @@ async def cmd_admin(message: Message):
         t(lang, "admin_menu", count=count), parse_mode="HTML",
         reply_markup=keyboards.admin_menu(lang),
     )
+
+
+@router.message(Command("health"))
+async def cmd_health(message: Message):
+    uid = message.from_user.id
+    lang = state.lang(uid)
+    if not ADMIN_ID or uid != ADMIN_ID:
+        await message.answer(t(lang, "admin_denied"), parse_mode="HTML")
+        return
+    report = health_report()
+    body = "\n".join(f"{escape(k)}: <code>{escape(v)}</code>" for k, v in report.items())
+    await message.answer(f"🩺 <b>Healthcheck</b>\n\n{body}", parse_mode="HTML")
 
 
 @router.callback_query(F.data == "admin:add_bg")

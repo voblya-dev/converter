@@ -1,0 +1,9 @@
+.git
+.env
+__pycache__
+*.pyc
+data/tmp
+data/users
+data/logs
+data/*.sqlite3
+Telegram Ducks.html

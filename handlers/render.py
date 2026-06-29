@@ -19,10 +19,11 @@ from html import escape
 from aiogram import Router, F, Bot
 from aiogram.types import CallbackQuery, FSInputFile
 
-from config import BACKGROUNDS_DIR, TMP_DIR
+from config import BACKGROUNDS_DIR, MAX_RENDER_SECONDS, TMP_DIR
 from utils import state, keyboards
 from utils.i18n import t
 from utils.progress import bar
+from utils.render_queue import RenderQueueFull, render_slot
 from services import renderer
 
 router = Router(name="render")
@@ -149,9 +150,21 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
 
     anim_task = asyncio.create_task(animator())
     try:
-        result_path: Path = await runner()
+        async with render_slot(uid):
+            result_path: Path = await asyncio.wait_for(runner(), timeout=max(1, MAX_RENDER_SECONDS))
         progress_state["pct"] = 100
         progress_state["stage"] = "final"
+    except RenderQueueFull:
+        progress_state["done"] = True
+        await anim_task
+        await progress_msg.edit_text(t(lang, "render_queue_full"), parse_mode="HTML")
+        return
+    except asyncio.TimeoutError:
+        _cancel_flags[uid] = True
+        progress_state["done"] = True
+        await anim_task
+        await progress_msg.edit_text(t(lang, "render_timeout"), parse_mode="HTML")
+        return
     except renderer.RenderCancelled:
         progress_state["done"] = True
         await anim_task

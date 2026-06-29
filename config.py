@@ -16,8 +16,10 @@ BACKGROUNDS_DIR = ASSETS_DIR / "backgrounds"
 DATA_DIR = BASE_DIR / "data"
 USERS_DIR = DATA_DIR / "users"
 TMP_DIR = DATA_DIR / "tmp"
+LOG_DIR = DATA_DIR / "logs"
+DB_PATH = Path(os.getenv("DB_PATH", str(DATA_DIR / "bot.sqlite3")))
 
-for _d in (USERS_DIR, TMP_DIR, FONTS_DIR, PRESETS_DIR, BACKGROUNDS_DIR):
+for _d in (USERS_DIR, TMP_DIR, FONTS_DIR, PRESETS_DIR, BACKGROUNDS_DIR, LOG_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
 # ───────── Бот ─────────
@@ -26,6 +28,11 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0") or 0)
 FFMPEG_PATH = os.getenv("FFMPEG_PATH", "ffmpeg")
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "20"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+TMP_MAX_AGE_HOURS = int(os.getenv("TMP_MAX_AGE_HOURS", "24"))
+MAX_RENDER_SECONDS = int(os.getenv("MAX_RENDER_SECONDS", "180"))
+MAX_RENDER_FRAMES = int(os.getenv("MAX_RENDER_FRAMES", "180"))
+MAX_PARALLEL_RENDERS = int(os.getenv("MAX_PARALLEL_RENDERS", "2"))
+MAX_USER_QUEUE = int(os.getenv("MAX_USER_QUEUE", "1"))
 
 # ───────── Палитра (20 цветов) ─────────
 COLOR_PALETTE = [

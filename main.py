@@ -8,6 +8,7 @@
 """
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
 import sys
 from pathlib import Path
 
@@ -17,17 +18,33 @@ from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramUnauthorizedError
 from aiogram.types import BotCommand
 
-from config import BOT_TOKEN, LOG_LEVEL
+from config import BOT_TOKEN, LOG_DIR, LOG_LEVEL
 from handlers import setup_routers
 from utils.cleanup import cleanup_tmp
 
 
 def _setup_logging() -> None:
-    logging.basicConfig(
-        level=getattr(logging, LOG_LEVEL.upper(), logging.INFO),
-        format="%(asctime)s · %(levelname)-7s · %(name)s · %(message)s",
+    level = getattr(logging, LOG_LEVEL.upper(), logging.INFO)
+    fmt = logging.Formatter(
+        "%(asctime)s · %(levelname)-7s · %(name)s · %(message)s",
         datefmt="%H:%M:%S",
     )
+    root = logging.getLogger()
+    root.setLevel(level)
+    root.handlers.clear()
+
+    stream = logging.StreamHandler()
+    stream.setFormatter(fmt)
+    root.addHandler(stream)
+
+    file_handler = RotatingFileHandler(
+        LOG_DIR / "bot.log",
+        maxBytes=2_000_000,
+        backupCount=5,
+        encoding="utf-8",
+    )
+    file_handler.setFormatter(fmt)
+    root.addHandler(file_handler)
 
 
 async def main() -> None:

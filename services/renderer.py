@@ -20,7 +20,7 @@ from typing import Callable
 import numpy as np
 from PIL import Image
 
-from config import TMP_DIR
+from config import MAX_RENDER_FRAMES, TMP_DIR
 from services import (
     tgs_processor, sticker_processor, emoji_renderer,
     background_builder, watermark_engine, encoder,
@@ -48,7 +48,9 @@ def _effective_fps(raw_fps, src_fps: int, fmt: str) -> int:
 def _max_frames_for(total_frames: int, fmt: str) -> int | None:
     if fmt == "png":
         return 1
-    return max(1, int(total_frames)) if total_frames else None
+    if total_frames:
+        return max(1, min(MAX_RENDER_FRAMES, int(total_frames)))
+    return MAX_RENDER_FRAMES
 
 
 def _resample_frame_paths(frames: list[Path], src_fps: int, target_fps: int) -> list[Path]:

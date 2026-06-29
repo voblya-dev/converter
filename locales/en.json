@@ -61,6 +61,8 @@
   "render_error": "⚠️ <b>Render error:</b> <code>{err}</code>",
   "render_cancel": "🛑 Cancel",
   "render_cancelled": "🛑 <b>Render cancelled.</b>",
+  "render_timeout": "⏱ <b>Render stopped by timeout.</b>\n<blockquote>Try lower FPS/resolution or MP4 instead of GIF.</blockquote>",
+  "render_queue_full": "⚠️ <b>You already have an active render.</b>\n<blockquote>Wait for it to finish or press cancel.</blockquote>",
   "no_input": "⚠️ First send a <b>sticker</b> or <b>emoji</b>.",
   "settings_reset": "🔄 Settings reset.",
   "lang_switched": "🌐 Language switched to <b>English</b>.",

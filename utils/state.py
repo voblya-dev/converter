@@ -1,39 +1,103 @@
-"""
-Простое хранилище состояний пользователей: in-memory + JSON-снапшоты
-на диск (data/users/<user_id>.json). Достаточно для одиночного инстанса бота.
-"""
+"""SQLite-backed user settings storage with JSON migration compatibility."""
 import json
 import copy
 import threading
-from pathlib import Path
-from config import USERS_DIR, DEFAULT_SETTINGS
+import sqlite3
+from config import DB_PATH, USERS_DIR, DEFAULT_SETTINGS
 
 _lock = threading.RLock()
 _cache: dict[int, dict] = {}
+_initialized = False
 
 
-def _path(uid: int) -> Path:
-    return USERS_DIR / f"{uid}.json"
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA synchronous=NORMAL")
+    return conn
+
+
+def init() -> None:
+    global _initialized
+    with _lock:
+        if _initialized:
+            return
+        with _connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id INTEGER PRIMARY KEY,
+                    settings_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS awaits (
+                    user_id INTEGER PRIMARY KEY,
+                    await_key TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        _initialized = True
+        _migrate_json_files()
+
+
+def _load_from_db(uid: int) -> dict | None:
+    init()
+    with _connect() as conn:
+        row = conn.execute("SELECT settings_json FROM users WHERE user_id = ?", (uid,)).fetchone()
+    if not row:
+        return None
+    return json.loads(row[0])
+
+
+def _save_to_db(uid: int, settings: dict) -> None:
+    if not _initialized:
+        init()
+    payload = json.dumps(settings, ensure_ascii=False, separators=(",", ":"))
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO users(user_id, settings_json, updated_at)
+            VALUES(?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE SET
+                settings_json = excluded.settings_json,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (uid, payload),
+        )
+
+
+def _migrate_json_files() -> None:
+    for path in USERS_DIR.glob("*.json"):
+        try:
+            uid = int(path.stem)
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        with _connect() as conn:
+            exists = conn.execute("SELECT 1 FROM users WHERE user_id = ?", (uid,)).fetchone()
+        if exists:
+            continue
+        merged = copy.deepcopy(DEFAULT_SETTINGS)
+        _deep_merge(merged, data)
+        _migrate(merged)
+        _save_to_db(uid, merged)
 
 
 def get(uid: int) -> dict:
-    """Получить настройки пользователя (с загрузкой с диска при первом обращении)."""
+    """Получить настройки пользователя."""
     with _lock:
         if uid in _cache:
             return _cache[uid]
-        p = _path(uid)
-        if p.exists():
-            try:
-                data = json.loads(p.read_text(encoding="utf-8"))
-                # Дозаполняем недостающие ключи из дефолта
-                merged = copy.deepcopy(DEFAULT_SETTINGS)
-                _deep_merge(merged, data)
-                _migrate(merged)
-                _cache[uid] = merged
-                return merged
-            except Exception:
-                pass
-        _cache[uid] = copy.deepcopy(DEFAULT_SETTINGS)
+        data = _load_from_db(uid)
+        merged = copy.deepcopy(DEFAULT_SETTINGS)
+        if data:
+            _deep_merge(merged, data)
+        _migrate(merged)
+        _cache[uid] = merged
         return _cache[uid]
 
 
@@ -42,10 +106,7 @@ def save(uid: int) -> None:
     with _lock:
         if uid not in _cache:
             return
-        _path(uid).write_text(
-            json.dumps(_cache[uid], ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        _save_to_db(uid, _cache[uid])
 
 
 def reset(uid: int) -> dict:
@@ -71,14 +132,39 @@ _awaiting: dict[int, str] = {}
 
 
 def set_await(uid: int, key: str | None) -> None:
-    if key is None:
-        _awaiting.pop(uid, None)
-    else:
-        _awaiting[uid] = key
+    with _lock:
+        if key is None:
+            _awaiting.pop(uid, None)
+            init()
+            with _connect() as conn:
+                conn.execute("DELETE FROM awaits WHERE user_id = ?", (uid,))
+        else:
+            _awaiting[uid] = key
+            init()
+            with _connect() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO awaits(user_id, await_key, updated_at)
+                    VALUES(?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        await_key = excluded.await_key,
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (uid, key),
+                )
 
 
 def get_await(uid: int) -> str | None:
-    return _awaiting.get(uid)
+    with _lock:
+        if uid in _awaiting:
+            return _awaiting[uid]
+        init()
+        with _connect() as conn:
+            row = conn.execute("SELECT await_key FROM awaits WHERE user_id = ?", (uid,)).fetchone()
+        if row:
+            _awaiting[uid] = row[0]
+            return row[0]
+        return None
 
 
 # ───────── Помощники ─────────
