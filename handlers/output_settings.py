@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery
 from utils import state, keyboards
 from utils.i18n import t
 from utils.labels import quality_label
+from utils.messages import edit_or_answer
 
 router = Router(name="output")
 
@@ -39,10 +40,7 @@ def _out_text(s: dict, lang: str) -> str:
 
 
 async def _show_output_menu(call: CallbackQuery, text: str, markup) -> None:
-    if call.message.text:
-        await call.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
-    else:
-        await call.message.answer(text, parse_mode="HTML", reply_markup=markup)
+    await edit_or_answer(call.message, text, parse_mode="HTML", reply_markup=markup)
 
 
 @router.callback_query(F.data == "out:menu")

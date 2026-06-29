@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery
 from config import BACKGROUNDS_DIR, MAX_UPLOAD_MB
 from utils import state, keyboards
 from utils.i18n import t
+from utils.messages import edit_or_answer
 from handlers.start import main_menu_text
 
 router = Router(name="background")
@@ -32,7 +33,8 @@ async def cb_menu(call: CallbackQuery):
     s = state.get(uid)
     lang = s["lang"]
     state.set_await(uid, None)
-    await call.message.edit_text(
+    await edit_or_answer(
+        call.message,
         _bg_text(s, lang), parse_mode="HTML",
         reply_markup=keyboards.bg_menu(lang, s["background"]["mode"]),
     )
@@ -50,24 +52,28 @@ async def cb_mode(call: CallbackQuery):
 
     if mode == "color":
         state.set_await(uid, "bg_hex:1")
-        await call.message.edit_text(
+        await edit_or_answer(
+            call.message,
             t(lang, "bg_hex_prompt"), parse_mode="HTML",
             reply_markup=keyboards.hex_color_kb(lang, slot=1),
         )
     elif mode == "gradient":
-        await call.message.edit_text(
+        await edit_or_answer(
+            call.message,
             _bg_text(s, lang), parse_mode="HTML",
             reply_markup=keyboards.gradient_menu(lang, s["background"]["direction"]),
         )
     elif mode == "image":
         state.set_await(uid, "bg_image")
-        await call.message.edit_text(
+        await edit_or_answer(
+            call.message,
             t(lang, "bg_send_image"), parse_mode="HTML",
             reply_markup=keyboards.back_to_main(lang),
         )
     elif mode == "video":
         state.set_await(uid, "bg_video")
-        await call.message.edit_text(
+        await edit_or_answer(
+            call.message,
             t(lang, "bg_send_video", max_mb=MAX_UPLOAD_MB), parse_mode="HTML",
             reply_markup=keyboards.back_to_main(lang),
         )
@@ -79,7 +85,8 @@ async def cb_global(call: CallbackQuery):
     uid = call.from_user.id
     s = state.get(uid)
     lang = s["lang"]
-    await call.message.edit_text(
+    await edit_or_answer(
+        call.message,
         t(lang, "bg_global_title"), parse_mode="HTML",
         reply_markup=keyboards.global_backgrounds_kb(lang, s["background"].get("global_file")),
     )
@@ -90,7 +97,8 @@ async def cb_global(call: CallbackQuery):
 async def cb_styles(call: CallbackQuery):
     uid = call.from_user.id
     lang = state.lang(uid)
-    await call.message.edit_text(
+    await edit_or_answer(
+        call.message,
         t(lang, "bg_styles_title"), parse_mode="HTML",
         reply_markup=keyboards.bg_styles_kb(lang),
     )
@@ -107,7 +115,8 @@ async def cb_style_set(call: CallbackQuery):
         s["background"]["mode"] = "auto_palette"
         state.save(uid)
         await call.answer(t(lang, "bg_auto_palette_enabled", plain=True))
-        await call.message.edit_text(
+        await edit_or_answer(
+            call.message,
             _bg_text(s, lang), parse_mode="HTML",
             reply_markup=keyboards.bg_menu(lang, s["background"]["mode"]),
         )
@@ -122,7 +131,8 @@ async def cb_style_set(call: CallbackQuery):
     s["background"].update(presets.get(style, presets["telegram_blue"]))
     state.save(uid)
     await call.answer(t(lang, "bg_style_applied", plain=True))
-    await call.message.edit_text(
+    await edit_or_answer(
+        call.message,
         _bg_text(s, lang), parse_mode="HTML",
         reply_markup=keyboards.bg_menu(lang, s["background"]["mode"]),
     )
@@ -143,7 +153,8 @@ async def cb_setglobal(call: CallbackQuery):
     s["background"]["global_file"] = name
     state.save(uid)
     await call.answer("✓")
-    await call.message.edit_text(
+    await edit_or_answer(
+        call.message,
         _bg_text(s, lang), parse_mode="HTML",
         reply_markup=keyboards.bg_menu(lang, s["background"]["mode"]),
     )
@@ -166,7 +177,8 @@ async def cb_pick(call: CallbackQuery):
     lang = state.lang(uid)
     slot = int(call.data.split(":")[2])
     state.set_await(uid, f"bg_hex:{slot}")
-    await call.message.edit_text(
+    await edit_or_answer(
+        call.message,
         t(lang, "bg_hex_prompt"), parse_mode="HTML",
         reply_markup=keyboards.hex_color_kb(lang, slot=slot),
     )
@@ -180,7 +192,8 @@ async def cb_dir(call: CallbackQuery):
     lang = s["lang"]
     s["background"]["direction"] = call.data.split(":")[2]
     state.save(uid)
-    await call.message.edit_text(
+    await edit_or_answer(
+        call.message,
         _bg_text(s, lang), parse_mode="HTML",
         reply_markup=keyboards.gradient_menu(lang, s["background"]["direction"]),
     )
