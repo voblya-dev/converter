@@ -6,9 +6,7 @@ from aiogram.types import CallbackQuery
 
 from config import BACKGROUNDS_DIR, MAX_UPLOAD_MB
 from utils import state, keyboards
-from utils.files import find_input
 from utils.i18n import t
-from utils.palette import extract_palette
 from handlers.start import main_menu_text
 
 router = Router(name="background")
@@ -105,6 +103,15 @@ async def cb_style_set(call: CallbackQuery):
     s = state.get(uid)
     lang = s["lang"]
     style = call.data.split(":")[2]
+    if style == "auto_palette":
+        s["background"]["mode"] = "auto_palette"
+        state.save(uid)
+        await call.answer(t(lang, "bg_auto_palette_enabled", plain=True))
+        await call.message.edit_text(
+            _bg_text(s, lang), parse_mode="HTML",
+            reply_markup=keyboards.bg_menu(lang, s["background"]["mode"]),
+        )
+        return
     presets = {
         "neon": {"mode": "gradient", "color": "#00E5FF", "color2": "#FF2BD6", "direction": "diagonal"},
         "clean_white": {"mode": "gradient", "color": "#FFFFFF", "color2": "#E8EEF7", "direction": "vertical"},
@@ -115,29 +122,6 @@ async def cb_style_set(call: CallbackQuery):
     s["background"].update(presets.get(style, presets["telegram_blue"]))
     state.save(uid)
     await call.answer(t(lang, "bg_style_applied", plain=True))
-    await call.message.edit_text(
-        _bg_text(s, lang), parse_mode="HTML",
-        reply_markup=keyboards.bg_menu(lang, s["background"]["mode"]),
-    )
-
-
-@router.callback_query(F.data == "bg:auto_palette")
-async def cb_auto_palette(call: CallbackQuery):
-    uid = call.from_user.id
-    s = state.get(uid)
-    lang = s["lang"]
-    colors = extract_palette(s["input"].get("type"), find_input(uid, s), s["input"].get("emoji"))
-    if len(colors) < 2:
-        await call.answer(t(lang, "bg_palette_missing", plain=True), show_alert=True)
-        return
-    s["background"].update({
-        "mode": "gradient",
-        "color": colors[0],
-        "color2": colors[1],
-        "direction": "diagonal",
-    })
-    state.save(uid)
-    await call.answer(t(lang, "bg_palette_applied", plain=True))
     await call.message.edit_text(
         _bg_text(s, lang), parse_mode="HTML",
         reply_markup=keyboards.bg_menu(lang, s["background"]["mode"]),

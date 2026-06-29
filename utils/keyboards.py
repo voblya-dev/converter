@@ -45,15 +45,11 @@ def _add(kb: InlineKeyboardBuilder, text: str, callback_data: str, icon: str | N
 # ─────────────────────────  ГЛАВНОЕ МЕНЮ  ─────────────────────────
 def main_menu(lang: str) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    _add(kb, kt(lang, "scenario_sticker_mp4"), "main:scenario:sticker_mp4", icon="🎬", style="success")
-    _add(kb, kt(lang, "scenario_emoji_png"), "main:scenario:emoji_png", icon="😀", style="success")
-    _add(kb, kt(lang, "scenario_banner"), "main:scenario:banner", icon="📱", style="primary")
-    _add(kb, kt(lang, "scenario_transparent"), "main:scenario:transparent", icon="💎", style="primary")
     _add(kb, kt(lang, "btn_background"), "bg:menu", icon="🎨", style="primary")
     _add(kb, kt(lang, "btn_watermark"), "wm:menu", icon="💧", style="primary")
     _add(kb, kt(lang, "btn_settings"), "out:menu", icon="📐", style="primary")
     _add(kb, kt(lang, "btn_reset"), "main:reset", icon="🔄", style="danger")
-    kb.adjust(1, 1, 1, 1, 2, 2)
+    kb.adjust(2, 2)
     return kb.as_markup()
 
 
@@ -66,11 +62,9 @@ def bg_menu(lang: str, mode: str) -> InlineKeyboardMarkup:
     _add(kb, mark("gradient") + kt(lang, "bg_mode_gradient"), "bg:mode:gradient", icon="🌈", style="primary")
     _add(kb, mark("image") + kt(lang, "bg_mode_image"), "bg:mode:image", icon="🖼")
     _add(kb, mark("video") + kt(lang, "bg_mode_video"), "bg:mode:video", icon="🎬")
-    _add(kb, mark("global_image") + kt(lang, "bg_mode_global"), "bg:global", icon="📚")
     _add(kb, kt(lang, "bg_styles"), "bg:styles", icon="✨", style="primary")
-    _add(kb, kt(lang, "bg_auto_palette"), "bg:auto_palette", icon="🧪", style="primary")
     _add(kb, kt(lang, "btn_back"), "main:home", icon="⬅️", style="danger")
-    kb.adjust(2, 2, 2, 2)
+    kb.adjust(2, 2, 2)
     return kb.as_markup()
 
 
@@ -82,11 +76,13 @@ def bg_styles_kb(lang: str) -> InlineKeyboardMarkup:
         ("dark_glass", "bg_style_dark", "💻"),
         ("telegram_blue", "bg_style_telegram", "📱"),
         ("story", "bg_style_story", "🎉"),
+        ("auto_palette", "bg_auto_palette", "🧪"),
     ]
     for code, key, icon in styles:
         _add(kb, kt(lang, key), f"bg:style:{code}", icon=icon, style="primary")
+    _add(kb, kt(lang, "bg_mode_global"), "bg:global", icon="📚", style="primary")
     _add(kb, kt(lang, "btn_back"), "bg:menu", icon="⬅️", style="danger")
-    kb.adjust(1, 1, 1, 1, 1, 1)
+    kb.adjust(1, 1, 1, 1, 1, 1, 1, 1)
     return kb.as_markup()
 
 

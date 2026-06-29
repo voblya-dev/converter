@@ -42,6 +42,10 @@ def _bg_info(s: dict, lang: str) -> str:
         return t(lang, "preview_bg_image")
     if m == "video":
         return t(lang, "preview_bg_video")
+    if m == "global_image":
+        return t(lang, "preview_bg_global")
+    if m == "auto_palette":
+        return t(lang, "preview_bg_auto_palette")
     return m
 
 
@@ -194,33 +198,6 @@ async def cb_reset(call: CallbackQuery):
     s = state.reset(uid)
     lang = s["lang"]
     await call.answer(t(lang, "settings_reset", plain=True))
-    await call.message.edit_text(
-        main_menu_text(s, lang),
-        parse_mode="HTML",
-        reply_markup=keyboards.main_menu(lang),
-    )
-
-
-@router.callback_query(F.data.startswith("main:scenario:"))
-async def cb_scenario(call: CallbackQuery):
-    uid = call.from_user.id
-    s = state.get(uid)
-    lang = s["lang"]
-    scenario = call.data.split(":")[2]
-    if scenario == "sticker_mp4":
-        s["output"].update({"format": "mp4", "width": 512, "height": 512, "fps": "source", "quality": "medium"})
-        s["background"].update({"mode": "color", "color": "#000000"})
-    elif scenario == "emoji_png":
-        s["output"].update({"format": "png", "width": 512, "height": 512, "fps": 1, "quality": "lossless"})
-        s["background"].update({"mode": "color", "color": "#000000"})
-    elif scenario == "banner":
-        s["output"].update({"format": "mp4", "width": 1920, "height": 530, "fps": "source", "quality": "high"})
-        s["background"].update({"mode": "gradient", "color": "#0B1020", "color2": "#2AABEE", "direction": "horizontal"})
-    elif scenario == "transparent":
-        s["output"].update({"format": "webm", "width": 512, "height": 512, "fps": "source", "quality": "high"})
-        s["background"].update({"mode": "color", "color": "#000000"})
-    state.save(uid)
-    await call.answer(t(lang, "scenario_applied", plain=True))
     await call.message.edit_text(
         main_menu_text(s, lang),
         parse_mode="HTML",

@@ -22,8 +22,10 @@ from utils import state, keyboards
 from utils.i18n import t
 from utils.premium_emoji import premiumize_text
 from utils.colors import parse_hex
+from utils.files import find_input
 from handlers.start import main_menu_text
 from handlers.render import render_for_message
+from utils.palette import extract_palette
 
 router = Router(name="input")
 
@@ -47,6 +49,26 @@ async def _download(bot: Bot, file_id: str, dst: Path) -> Path:
 async def _telegram_file_path(bot: Bot, file_id: str) -> str:
     f = await bot.get_file(file_id)
     return f.file_path or ""
+
+
+def _apply_auto_palette(uid: int, s: dict) -> None:
+    if s["background"].get("mode") != "auto_palette":
+        return
+    colors = extract_palette(s["input"].get("type"), find_input(uid, s), s["input"].get("emoji"))
+    if len(colors) < 2:
+        s["background"].update({
+            "mode": "gradient",
+            "color": "#229ED9",
+            "color2": "#0B5CAD",
+            "direction": "diagonal",
+        })
+        return
+    s["background"].update({
+        "mode": "gradient",
+        "color": colors[0],
+        "color2": colors[1],
+        "direction": "diagonal",
+    })
 
 
 async def _accept_premium_emoji_sticker(message: Message, bot: Bot, st) -> None:
@@ -80,6 +102,7 @@ async def _accept_premium_emoji_sticker(message: Message, bot: Bot, st) -> None:
         s["input"]["emoji"] = getattr(st, "emoji", None)
         if s["output"].get("format") == "png":
             s["output"]["format"] = "mp4"
+        _apply_auto_palette(uid, s)
         state.save(uid)
         await render_for_message(message, bot, uid)
         return
@@ -134,6 +157,7 @@ async def _accept_sticker(message: Message, bot: Bot, st) -> None:
         s["output"]["format"] = "png"
     if in_type in {"tgs", "sticker_video"} and s["output"].get("format") == "png":
         s["output"]["format"] = "mp4"
+    _apply_auto_palette(uid, s)
     state.save(uid)
 
     await render_for_message(message, bot, uid)
@@ -415,6 +439,7 @@ async def on_text(message: Message, bot: Bot):
         s["input"]["emoji"] = text
         s["input"]["file_id"] = None
         s["output"]["format"] = "png"
+        _apply_auto_palette(uid, s)
         state.save(uid)
         await render_for_message(message, bot, uid)
         return
