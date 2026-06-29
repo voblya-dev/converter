@@ -205,7 +205,7 @@ def render(
         _raise_if_cancelled(cancelled)
         # ── 1. Исходные кадры ─────────────────────────────────
         if progress:
-            progress("frames", 5)
+            progress("download", 3)
 
         out = settings["output"]
         fmt = out["format"]
@@ -246,6 +246,8 @@ def render(
         target_fps = _effective_fps(fps_raw, src_fps, fmt)
         max_frames = _max_frames_for(src_total_frames, fmt)
 
+        if progress:
+            progress("draw", 8)
         src_frames, src_fps = _decode_source(
             settings["input"], input_path, work, target_fps=target_fps,
             render_size=source_render_size, max_frames=max_frames,
@@ -261,12 +263,12 @@ def render(
         frame_count = len(src_frames)
 
         if progress:
-            progress("frames", 25)
+            progress("draw", 25)
 
         if _can_use_fast_color_path(settings, fmt, bg_path):
             _raise_if_cancelled(cancelled)
             if progress:
-                progress("final", 80)
+                progress("encode", 80)
             ext = {"mp4": "mp4", "webm": "webm"}[fmt]
             out_file = work / f"result.{ext}"
             encoder.encode_centered_on_color(
@@ -283,7 +285,7 @@ def render(
             )
             _raise_if_cancelled(cancelled)
             if progress:
-                progress("final", 100)
+                progress("send", 100)
             if not out_file.exists() or out_file.stat().st_size == 0:
                 raise RuntimeError("Encoder produced empty file (check ffmpeg installation)")
             return out_file
@@ -302,7 +304,7 @@ def render(
         _raise_if_cancelled(cancelled)
 
         if progress:
-            progress("watermark", 45)
+            progress("draw", 45)
 
         # ── 4. Композитинг ───────────────────────────────────
         comp_dir = work / "comp"
@@ -325,7 +327,7 @@ def render(
                     done += 1
                     if progress and frame_count:
                         pct = 45 + int(35 * done / frame_count)
-                        progress("watermark", pct)
+                        progress("draw", pct)
         else:
             for idx, (src_path, bg_img) in frames_to_compose:
                 _raise_if_cancelled(cancelled)
@@ -335,11 +337,11 @@ def render(
                 )
                 if progress and frame_count:
                     pct = 45 + int(35 * (idx + 1) / frame_count)
-                    progress("watermark", pct)
+                    progress("draw", pct)
 
         # ── 5. Кодирование ───────────────────────────────────
         if progress:
-            progress("final", 85)
+            progress("encode", 85)
 
         _raise_if_cancelled(cancelled)
         ext = {"gif": "gif", "mp4": "mp4", "webm": "webm", "png": "png"}[fmt]
@@ -358,7 +360,7 @@ def render(
         _raise_if_cancelled(cancelled)
 
         if progress:
-            progress("final", 100)
+            progress("send", 100)
 
         if not out_file.exists() or out_file.stat().st_size == 0:
             raise RuntimeError("Encoder produced empty file (check ffmpeg installation)")

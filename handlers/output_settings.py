@@ -6,6 +6,7 @@ from aiogram.types import CallbackQuery
 
 from utils import state, keyboards
 from utils.i18n import t
+from utils.labels import quality_label
 
 router = Router(name="output")
 
@@ -31,7 +32,7 @@ def _out_text(s: dict, lang: str) -> str:
              format=o["format"].upper(),
              w=o["width"], h=o["height"],
              fps=o["fps"],
-             quality=o["quality"],
+             quality=quality_label(o["quality"], lang),
              speed=o.get("speed", 1.0),
              input_size=s["input"].get("size_pct", 80),
              colorize=colorize)

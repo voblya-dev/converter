@@ -19,12 +19,14 @@ from html import escape
 from aiogram import Router, F, Bot
 from aiogram.types import CallbackQuery, FSInputFile
 
-from config import BACKGROUNDS_DIR, MAX_RENDER_SECONDS, TMP_DIR
+from config import MAX_RENDER_SECONDS
 from utils import state, keyboards
+from utils.files import find_background, find_input, find_watermark_image
 from utils.i18n import t
 from utils.progress import bar
 from utils.render_queue import RenderQueueFull, render_slot
 from services import renderer
+from services import sticker_processor, tgs_processor
 
 router = Router(name="render")
 
@@ -32,46 +34,53 @@ router = Router(name="render")
 _cancel_flags: dict[int, bool] = {}
 
 
-def _user_dir(uid: int) -> Path:
-    return TMP_DIR / f"u{uid}"
+def _format_bytes(value: int) -> str:
+    size = float(value)
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024:
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"
 
 
-def _find_input(uid: int, s: dict) -> Path | None:
-    udir = _user_dir(uid)
-    it = s["input"].get("type")
-    if it == "tgs":
-        p = udir / "input.tgs"
-    elif it == "sticker":
-        p = udir / "input.webp"
-    elif it == "sticker_video":
-        p = udir / "input.webm"
-    else:
-        return None
-    return p if p.exists() else None
-
-
-def _find_bg(uid: int, s: dict) -> Path | None:
-    udir = _user_dir(uid)
-    m = s["background"]["mode"]
-    if m == "image":
-        p = udir / "bg.jpg"
-        return p if p.exists() else None
-    if m == "video":
-        p = udir / "bg.mp4"
-        return p if p.exists() else None
-    if m == "global_image":
-        name = s["background"].get("global_file")
-        if name:
-            p = BACKGROUNDS_DIR / name
-            return p if p.exists() else None
-    return None
-
-
-def _find_wm_image(uid: int, s: dict) -> Path | None:
-    if s["watermark"]["source"] == "image":
-        p = _user_dir(uid) / "wm.png"
-        return p if p.exists() else None
-    return None
+def _result_summary(path: Path, settings: dict, input_path: Path | None, lang: str) -> str:
+    out = settings["output"]
+    fmt = path.suffix.lstrip(".").upper() or out["format"].upper()
+    width = int(out["width"])
+    height = int(out["height"])
+    fps = out["fps"]
+    frames = 1
+    src_type = settings["input"].get("type")
+    try:
+        if src_type == "tgs" and input_path:
+            _w, _h, src_fps, frames = tgs_processor.tgs_info(input_path)
+            if fps == "source":
+                fps = int(round(src_fps)) or fps
+        elif src_type == "sticker" and input_path:
+            src_fps, frames = sticker_processor.webp_info(input_path)
+            if fps == "source":
+                fps = int(round(src_fps)) or fps
+        elif src_type == "sticker_video" and input_path:
+            src_fps, frames = sticker_processor.webm_info(input_path)
+            if fps == "source":
+                fps = int(round(src_fps)) or fps
+    except Exception:
+        frames = 1
+    duration = 0.0
+    try:
+        duration = max(0.0, frames / max(1, int(fps))) if fmt != "PNG" else 0.0
+    except Exception:
+        duration = 0.0
+    return t(
+        lang,
+        "render_summary",
+        fmt=fmt,
+        w=width,
+        h=height,
+        fps=fps,
+        duration=f"{duration:.1f}",
+        size=_format_bytes(path.stat().st_size),
+    )
 
 
 @router.callback_query(F.data == "render:cancel")
@@ -117,10 +126,14 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
             progress_state["pct"] = cur
 
             key = {
-                "frames":    "render_frames",
-                "watermark": "render_watermark",
-                "final":     "render_final",
-            }.get(stage, "render_frames")
+                "download": "render_download",
+                "draw":     "render_draw",
+                "frames":   "render_draw",
+                "watermark": "render_draw",
+                "encode":   "render_encode",
+                "final":    "render_encode",
+                "send":     "render_send",
+            }.get(stage, "render_draw")
 
             txt = t(lang, key, bar=bar(cur), pct=cur)
             if txt != last_text:
@@ -140,9 +153,9 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
             None,
             lambda: renderer.render(
                 s,
-                _find_input(uid, s),
-                _find_bg(uid, s),
-                _find_wm_image(uid, s),
+                find_input(uid, s),
+                find_background(uid, s),
+                find_watermark_image(uid, s),
                 progress_cb,
                 lambda: _cancel_flags.get(uid, False),
             ),
@@ -197,16 +210,17 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
     fmt = result_path.suffix.lstrip(".").lower() or s["output"]["format"]
     file = FSInputFile(str(result_path))
     result_kb = keyboards.render_result(lang)
+    summary = _result_summary(result_path, s, find_input(uid, s), lang)
     if fmt == "gif":
-        await message.answer_document(file, reply_markup=result_kb)
+        await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
     elif fmt == "mp4":
-        await message.answer_video(file, reply_markup=result_kb)
+        await message.answer_video(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
     elif fmt == "webm":
-        await message.answer_document(file, reply_markup=result_kb)
+        await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
     elif fmt == "png":
-        await message.answer_photo(file, reply_markup=result_kb)
+        await message.answer_photo(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
     else:
-        await message.answer_document(file, reply_markup=result_kb)
+        await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
 
     shutil.rmtree(result_path.parent, ignore_errors=True)
     _cancel_flags.pop(uid, None)

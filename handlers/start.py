@@ -9,6 +9,7 @@ from config import ADMIN_ID, BACKGROUNDS_DIR
 from utils import state, keyboards
 from utils.health import health_report
 from utils.i18n import t
+from utils.labels import quality_label
 from utils.premium_emoji import premiumize_text
 
 router = Router(name="start")
@@ -59,7 +60,7 @@ def main_menu_text(s: dict, lang: str) -> str:
              w=s["output"]["width"],
              h=s["output"]["height"],
              fps=s["output"]["fps"],
-             quality=s["output"]["quality"],
+             quality=quality_label(s["output"]["quality"], lang),
              wm_info=_wm_info(s, lang))
 
 
@@ -193,6 +194,33 @@ async def cb_reset(call: CallbackQuery):
     s = state.reset(uid)
     lang = s["lang"]
     await call.answer(t(lang, "settings_reset", plain=True))
+    await call.message.edit_text(
+        main_menu_text(s, lang),
+        parse_mode="HTML",
+        reply_markup=keyboards.main_menu(lang),
+    )
+
+
+@router.callback_query(F.data.startswith("main:scenario:"))
+async def cb_scenario(call: CallbackQuery):
+    uid = call.from_user.id
+    s = state.get(uid)
+    lang = s["lang"]
+    scenario = call.data.split(":")[2]
+    if scenario == "sticker_mp4":
+        s["output"].update({"format": "mp4", "width": 512, "height": 512, "fps": "source", "quality": "medium"})
+        s["background"].update({"mode": "color", "color": "#000000"})
+    elif scenario == "emoji_png":
+        s["output"].update({"format": "png", "width": 512, "height": 512, "fps": 1, "quality": "lossless"})
+        s["background"].update({"mode": "color", "color": "#000000"})
+    elif scenario == "banner":
+        s["output"].update({"format": "mp4", "width": 1920, "height": 530, "fps": "source", "quality": "high"})
+        s["background"].update({"mode": "gradient", "color": "#0B1020", "color2": "#2AABEE", "direction": "horizontal"})
+    elif scenario == "transparent":
+        s["output"].update({"format": "webm", "width": 512, "height": 512, "fps": "source", "quality": "high"})
+        s["background"].update({"mode": "color", "color": "#000000"})
+    state.save(uid)
+    await call.answer(t(lang, "scenario_applied", plain=True))
     await call.message.edit_text(
         main_menu_text(s, lang),
         parse_mode="HTML",

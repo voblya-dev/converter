@@ -20,6 +20,7 @@ from config import (
     QUALITY_LEVELS, OUTPUT_FORMATS, WM_ROTATIONS, BUILTIN_FONTS,
 )
 from utils.i18n import t
+from utils.labels import quality_label
 from utils.premium_emoji import premium_button
 
 
@@ -44,11 +45,15 @@ def _add(kb: InlineKeyboardBuilder, text: str, callback_data: str, icon: str | N
 # ─────────────────────────  ГЛАВНОЕ МЕНЮ  ─────────────────────────
 def main_menu(lang: str) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    _add(kb, kt(lang, "scenario_sticker_mp4"), "main:scenario:sticker_mp4", icon="🎬", style="success")
+    _add(kb, kt(lang, "scenario_emoji_png"), "main:scenario:emoji_png", icon="😀", style="success")
+    _add(kb, kt(lang, "scenario_banner"), "main:scenario:banner", icon="📱", style="primary")
+    _add(kb, kt(lang, "scenario_transparent"), "main:scenario:transparent", icon="💎", style="primary")
     _add(kb, kt(lang, "btn_background"), "bg:menu", icon="🎨", style="primary")
     _add(kb, kt(lang, "btn_watermark"), "wm:menu", icon="💧", style="primary")
     _add(kb, kt(lang, "btn_settings"), "out:menu", icon="📐", style="primary")
     _add(kb, kt(lang, "btn_reset"), "main:reset", icon="🔄", style="danger")
-    kb.adjust(2, 2)
+    kb.adjust(1, 1, 1, 1, 2, 2)
     return kb.as_markup()
 
 
@@ -62,8 +67,26 @@ def bg_menu(lang: str, mode: str) -> InlineKeyboardMarkup:
     _add(kb, mark("image") + kt(lang, "bg_mode_image"), "bg:mode:image", icon="🖼")
     _add(kb, mark("video") + kt(lang, "bg_mode_video"), "bg:mode:video", icon="🎬")
     _add(kb, mark("global_image") + kt(lang, "bg_mode_global"), "bg:global", icon="📚")
+    _add(kb, kt(lang, "bg_styles"), "bg:styles", icon="✨", style="primary")
+    _add(kb, kt(lang, "bg_auto_palette"), "bg:auto_palette", icon="🧪", style="primary")
     _add(kb, kt(lang, "btn_back"), "main:home", icon="⬅️", style="danger")
-    kb.adjust(2, 2, 2)
+    kb.adjust(2, 2, 2, 2)
+    return kb.as_markup()
+
+
+def bg_styles_kb(lang: str) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    styles = [
+        ("neon", "bg_style_neon", "🔥"),
+        ("clean_white", "bg_style_clean", "💎"),
+        ("dark_glass", "bg_style_dark", "💻"),
+        ("telegram_blue", "bg_style_telegram", "📱"),
+        ("story", "bg_style_story", "🎉"),
+    ]
+    for code, key, icon in styles:
+        _add(kb, kt(lang, key), f"bg:style:{code}", icon=icon, style="primary")
+    _add(kb, kt(lang, "btn_back"), "bg:menu", icon="⬅️", style="danger")
+    kb.adjust(1, 1, 1, 1, 1, 1)
     return kb.as_markup()
 
 
@@ -164,12 +187,9 @@ def out_fps_kb(lang: str, current) -> InlineKeyboardMarkup:
 
 def out_quality_kb(lang: str, current: str) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    titles = {"low": "Низкое", "medium": "Среднее", "high": "Высокое", "lossless": "Без сжатия"}
-    titles_en = {"low": "Low", "medium": "Medium", "high": "High", "lossless": "Lossless"}
-    src = titles_en if lang == "en" else titles
     for q in QUALITY_LEVELS:
         mark = "● " if q == current else ""
-        kb.button(text=f"{mark}{src[q]}", callback_data=f"out:setquality:{q}")
+        kb.button(text=f"{mark}{quality_label(q, lang)}", callback_data=f"out:setquality:{q}")
     _add(kb, kt(lang, "btn_back"), "out:menu", icon="⬅️", style="danger")
     kb.adjust(2, 2, 1)
     return kb.as_markup()
@@ -359,4 +379,3 @@ def render_result(lang: str) -> InlineKeyboardMarkup:
     _add(kb, kt(lang, "btn_background"), "bg:menu", icon="🎨", style="primary")
     kb.adjust(2)
     return kb.as_markup()
-

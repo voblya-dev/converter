@@ -6,7 +6,9 @@ from aiogram.types import CallbackQuery
 
 from config import BACKGROUNDS_DIR, MAX_UPLOAD_MB
 from utils import state, keyboards
+from utils.files import find_input
 from utils.i18n import t
+from utils.palette import extract_palette
 from handlers.start import main_menu_text
 
 router = Router(name="background")
@@ -84,6 +86,62 @@ async def cb_global(call: CallbackQuery):
         reply_markup=keyboards.global_backgrounds_kb(lang, s["background"].get("global_file")),
     )
     await call.answer()
+
+
+@router.callback_query(F.data == "bg:styles")
+async def cb_styles(call: CallbackQuery):
+    uid = call.from_user.id
+    lang = state.lang(uid)
+    await call.message.edit_text(
+        t(lang, "bg_styles_title"), parse_mode="HTML",
+        reply_markup=keyboards.bg_styles_kb(lang),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("bg:style:"))
+async def cb_style_set(call: CallbackQuery):
+    uid = call.from_user.id
+    s = state.get(uid)
+    lang = s["lang"]
+    style = call.data.split(":")[2]
+    presets = {
+        "neon": {"mode": "gradient", "color": "#00E5FF", "color2": "#FF2BD6", "direction": "diagonal"},
+        "clean_white": {"mode": "gradient", "color": "#FFFFFF", "color2": "#E8EEF7", "direction": "vertical"},
+        "dark_glass": {"mode": "gradient", "color": "#05070D", "color2": "#243041", "direction": "diagonal"},
+        "telegram_blue": {"mode": "gradient", "color": "#229ED9", "color2": "#0B5CAD", "direction": "vertical"},
+        "story": {"mode": "gradient", "color": "#FF6A3D", "color2": "#7C3AED", "direction": "diagonal"},
+    }
+    s["background"].update(presets.get(style, presets["telegram_blue"]))
+    state.save(uid)
+    await call.answer(t(lang, "bg_style_applied", plain=True))
+    await call.message.edit_text(
+        _bg_text(s, lang), parse_mode="HTML",
+        reply_markup=keyboards.bg_menu(lang, s["background"]["mode"]),
+    )
+
+
+@router.callback_query(F.data == "bg:auto_palette")
+async def cb_auto_palette(call: CallbackQuery):
+    uid = call.from_user.id
+    s = state.get(uid)
+    lang = s["lang"]
+    colors = extract_palette(s["input"].get("type"), find_input(uid, s), s["input"].get("emoji"))
+    if len(colors) < 2:
+        await call.answer(t(lang, "bg_palette_missing", plain=True), show_alert=True)
+        return
+    s["background"].update({
+        "mode": "gradient",
+        "color": colors[0],
+        "color2": colors[1],
+        "direction": "diagonal",
+    })
+    state.save(uid)
+    await call.answer(t(lang, "bg_palette_applied", plain=True))
+    await call.message.edit_text(
+        _bg_text(s, lang), parse_mode="HTML",
+        reply_markup=keyboards.bg_menu(lang, s["background"]["mode"]),
+    )
 
 
 @router.callback_query(F.data.startswith("bg:setglobal:"))
