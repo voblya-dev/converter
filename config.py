@@ -88,6 +88,7 @@ DEFAULT_SETTINGS = {
     "lang":        "ru",
     "background": {
         "mode":   "color",        # color | gradient | image | video | global_image
+        "auto_palette": False,
         "color":  "#000000",
         "color2": "#8E24AA",      # для градиента
         "direction": "vertical",  # vertical | horizontal | diagonal
@@ -136,6 +137,7 @@ DEFAULT_SETTINGS = {
         "size_pct": 80,           # % от холста для исходного стикера/эмодзи
         "colorize": {
             "enabled": False,
+            "auto": False,
             "color": "#FFFFFF",
             "strength": 100,
         },

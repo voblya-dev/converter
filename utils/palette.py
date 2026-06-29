@@ -46,6 +46,10 @@ def extract_palette(input_type: str | None, src_file: Path | None, emoji: str | 
             frames = sticker_processor.render_webp_to_frames(src_file, work, max_frames=1)
             with Image.open(frames[0]) as img:
                 return _dominant_colors(img)
+        if input_type == "sticker_video" and src_file and src_file.exists():
+            frames = sticker_processor.render_webm_to_frames(src_file, work, max_frames=1)
+            with Image.open(frames[0]) as img:
+                return _dominant_colors(img)
         if input_type == "tgs" and src_file and src_file.exists():
             frames, _fps = tgs_processor.render_tgs_to_frames(src_file, work, max_frames=1, target_fps=1)
             with Image.open(frames[0]) as img:

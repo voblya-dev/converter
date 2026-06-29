@@ -15,6 +15,7 @@ router = Router(name="output")
 def _colorize_cfg(s: dict) -> dict:
     cfg = s["input"].setdefault("colorize", {})
     cfg.setdefault("enabled", False)
+    cfg.setdefault("auto", False)
     cfg.setdefault("color", "#FFFFFF")
     cfg.setdefault("strength", 100)
     return cfg
@@ -25,7 +26,8 @@ def _out_text(s: dict, lang: str) -> str:
     c = _colorize_cfg(s)
     colorize = t(
         lang,
-        "input_colorize_on" if c.get("enabled") else "input_colorize_off",
+        "input_colorize_auto_on" if c.get("enabled") and c.get("auto")
+        else "input_colorize_on" if c.get("enabled") else "input_colorize_off",
         color=c.get("color", "#FFFFFF"),
         strength=c.get("strength", 100),
     )
@@ -224,6 +226,21 @@ async def cb_colorize_toggle(call: CallbackQuery):
     s = state.get(uid)
     cfg = _colorize_cfg(s)
     cfg["enabled"] = not cfg.get("enabled", False)
+    if not cfg["enabled"]:
+        cfg["auto"] = False
+    state.save(uid)
+    await call.answer("✓")
+    await call.message.edit_text(_out_text(s, s["lang"]), parse_mode="HTML",
+                                 reply_markup=keyboards.input_colorize_kb(s["lang"], cfg))
+
+
+@router.callback_query(F.data == "out:colorize:auto")
+async def cb_colorize_auto(call: CallbackQuery):
+    uid = call.from_user.id
+    s = state.get(uid)
+    cfg = _colorize_cfg(s)
+    cfg["auto"] = not cfg.get("auto", False)
+    cfg["enabled"] = cfg["auto"] or cfg.get("enabled", False)
     state.save(uid)
     await call.answer("✓")
     await call.message.edit_text(_out_text(s, s["lang"]), parse_mode="HTML",

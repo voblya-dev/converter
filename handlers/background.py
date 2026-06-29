@@ -22,8 +22,9 @@ def _global_background_files() -> list[str]:
 
 def _bg_text(s: dict, lang: str) -> str:
     bg = s["background"]
+    mode = "auto_palette" if bg.get("auto_palette") else bg["mode"]
     return t(lang, "bg_menu",
-             mode=bg["mode"], color=bg["color"],
+             mode=mode, color=bg["color"],
              color2=bg["color2"], direction=bg["direction"])
 
 
@@ -48,6 +49,7 @@ async def cb_mode(call: CallbackQuery):
     lang = s["lang"]
     mode = call.data.split(":")[2]
     s["background"]["mode"] = mode
+    s["background"]["auto_palette"] = False
     state.save(uid)
 
     if mode == "color":
@@ -112,13 +114,13 @@ async def cb_style_set(call: CallbackQuery):
     lang = s["lang"]
     style = call.data.split(":")[2]
     if style == "auto_palette":
-        s["background"]["mode"] = "auto_palette"
+        s["background"]["auto_palette"] = True
         state.save(uid)
         await call.answer(t(lang, "bg_auto_palette_enabled", plain=True))
         await edit_or_answer(
             call.message,
             _bg_text(s, lang), parse_mode="HTML",
-            reply_markup=keyboards.bg_menu(lang, s["background"]["mode"]),
+            reply_markup=keyboards.bg_menu(lang, "auto_palette"),
         )
         return
     presets = {
@@ -129,6 +131,7 @@ async def cb_style_set(call: CallbackQuery):
         "story": {"mode": "gradient", "color": "#FF6A3D", "color2": "#7C3AED", "direction": "diagonal"},
     }
     s["background"].update(presets.get(style, presets["telegram_blue"]))
+    s["background"]["auto_palette"] = False
     state.save(uid)
     await call.answer(t(lang, "bg_style_applied", plain=True))
     await edit_or_answer(
@@ -150,6 +153,7 @@ async def cb_setglobal(call: CallbackQuery):
         return
     name = files[int(raw)]
     s["background"]["mode"] = "global_image"
+    s["background"]["auto_palette"] = False
     s["background"]["global_file"] = name
     state.save(uid)
     await call.answer("✓")

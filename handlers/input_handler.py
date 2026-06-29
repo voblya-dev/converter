@@ -52,12 +52,13 @@ async def _telegram_file_path(bot: Bot, file_id: str) -> str:
 
 
 def _apply_auto_palette(uid: int, s: dict) -> None:
-    if s["background"].get("mode") != "auto_palette":
+    if not s["background"].get("auto_palette"):
         return
     colors = extract_palette(s["input"].get("type"), find_input(uid, s), s["input"].get("emoji"))
     if len(colors) < 2:
         s["background"].update({
             "mode": "gradient",
+            "auto_palette": True,
             "color": "#229ED9",
             "color2": "#0B5CAD",
             "direction": "diagonal",
@@ -65,6 +66,7 @@ def _apply_auto_palette(uid: int, s: dict) -> None:
         return
     s["background"].update({
         "mode": "gradient",
+        "auto_palette": True,
         "color": colors[0],
         "color2": colors[1],
         "direction": "diagonal",
@@ -397,6 +399,7 @@ async def on_text(message: Message, bot: Bot):
         cfg.setdefault("strength", 100)
         cfg["color"] = h
         cfg["enabled"] = True
+        cfg["auto"] = False
         state.save(uid)
         state.set_await(uid, None)
         await message.answer(_msg(f"✅ Цвет исходника: `{h}`"), parse_mode="HTML")

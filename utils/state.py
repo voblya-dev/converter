@@ -178,8 +178,13 @@ def _deep_merge(dst: dict, src: dict) -> None:
 
 def _migrate(settings: dict) -> None:
     colorize = settings.get("input", {}).get("colorize", {})
+    colorize.setdefault("auto", DEFAULT_SETTINGS["input"]["colorize"].get("auto", False))
     if colorize.get("enabled") is False and colorize.get("strength") == 85:
         colorize["strength"] = DEFAULT_SETTINGS["input"]["colorize"]["strength"]
+    settings.get("background", {}).setdefault(
+        "auto_palette",
+        DEFAULT_SETTINGS["background"].get("auto_palette", False),
+    )
     output = settings.get("output", {})
     if output.get("quality") == "high":
         output["quality"] = DEFAULT_SETTINGS["output"]["quality"]

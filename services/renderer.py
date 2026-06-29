@@ -26,6 +26,7 @@ from services import (
     background_builder, watermark_engine, encoder,
 )
 from services.ffmpeg_runner import FfmpegCancelled
+from utils.colors import hex_to_rgb, rgb_to_hex
 
 
 ProgressCb = Callable[[str, int], None]
@@ -139,6 +140,19 @@ def _colorize_source(img: Image.Image, cfg: dict) -> Image.Image:
     return Image.fromarray(out, "RGBA")
 
 
+def _background_tint_color(settings: dict) -> str:
+    bg = settings.get("background", {})
+    mode = bg.get("mode")
+    if mode == "gradient":
+        c1 = hex_to_rgb(bg.get("color", "#FFFFFF"))
+        c2 = hex_to_rgb(bg.get("color2", "#FFFFFF"))
+        avg = tuple(int((c1[i] * 0.65 + c2[i] * 0.35)) for i in range(3))
+        return rgb_to_hex(avg)
+    if mode == "color":
+        return bg.get("color", "#FFFFFF")
+    return bg.get("color", "#FFFFFF")
+
+
 def _compose_frame(
     idx: int,
     src_path: Path,
@@ -153,7 +167,10 @@ def _compose_frame(
     W, H = size
     with Image.open(src_path) as src:
         src_img = src.convert("RGBA")
-    src_img = _colorize_source(src_img, settings["input"].get("colorize", {}))
+    colorize_cfg = dict(settings["input"].get("colorize", {}))
+    if colorize_cfg.get("auto"):
+        colorize_cfg["color"] = _background_tint_color(settings)
+    src_img = _colorize_source(src_img, colorize_cfg)
     inner_w = int(W * input_size_pct / 100)
     inner_h = int(H * input_size_pct / 100)
     scaled = _scale_keep_aspect(src_img, inner_w, inner_h)

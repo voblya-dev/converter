@@ -217,6 +217,7 @@ def input_size_kb(lang: str, current: int) -> InlineKeyboardMarkup:
 def input_colorize_kb(lang: str, cfg: dict) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     enabled = bool(cfg.get("enabled"))
+    auto = bool(cfg.get("auto"))
     _add(
         kb,
         kt(lang, "input_colorize_disable" if enabled else "input_colorize_enable"),
@@ -224,12 +225,19 @@ def input_colorize_kb(lang: str, cfg: dict) -> InlineKeyboardMarkup:
         icon="✅" if enabled else "❌",
         style="success" if enabled else "danger",
     )
+    _add(
+        kb,
+        kt(lang, "input_colorize_auto_disable" if auto else "input_colorize_auto_enable"),
+        "out:colorize:auto",
+        icon="🧪",
+        style="success" if auto else "primary",
+    )
     _add(kb, kt(lang, "input_colorize_hex"), "out:colorize:hex", icon="✏️", style="primary")
     for value in (50, 70, 85, 100):
         mark = "● " if int(cfg.get("strength", 85)) == value else ""
         kb.button(text=f"{mark}{value}%", callback_data=f"out:colorize:strength:{value}")
     _add(kb, kt(lang, "btn_back"), "out:menu", icon="⬅️")
-    kb.adjust(2, 4, 1)
+    kb.adjust(1, 2, 4, 1)
     return kb.as_markup()
 
 

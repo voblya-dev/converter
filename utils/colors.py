@@ -86,6 +86,10 @@ def hex_to_rgb(h: str) -> tuple[int, int, int]:
     return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))  # type: ignore
 
 
+def rgb_to_hex(rgb: tuple[int, int, int]) -> str:
+    return "#{:02X}{:02X}{:02X}".format(*rgb)
+
+
 def hex_to_rgba(h: str, alpha: int = 255) -> tuple[int, int, int, int]:
     r, g, b = hex_to_rgb(h)
     return (r, g, b, alpha)
