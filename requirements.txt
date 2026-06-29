@@ -1,0 +1,11 @@
+aiogram==3.13.1
+python-dotenv==1.0.1
+Pillow==10.4.0
+numpy==1.26.4
+emoji==2.12.1
+pilmoji==2.0.4
+requests==2.32.3
+ffmpeg-python==0.2.0
+moviepy>=2.0.0
+pyrlottie>=2024.0.1
+aiofiles==24.1.0
