@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Callable
 
 from config import BASE_DIR, FFMPEG_PATH
 
@@ -38,9 +39,37 @@ def resolve_ffmpeg() -> str:
     )
 
 
-def run_ffmpeg(args: list[str]) -> subprocess.CompletedProcess[bytes]:
+CancelCb = Callable[[], bool]
+
+
+class FfmpegCancelled(RuntimeError):
+    """Raised when an active ffmpeg process is cancelled."""
+
+
+def run_ffmpeg(args: list[str], cancelled: CancelCb | None = None) -> subprocess.CompletedProcess[bytes]:
     cmd = [resolve_ffmpeg(), *args]
-    result = subprocess.run(cmd, check=False, capture_output=True)
+    if cancelled is None:
+        result = subprocess.run(cmd, check=False, capture_output=True)
+    else:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        while proc.poll() is None:
+            if cancelled():
+                proc.terminate()
+                try:
+                    stdout, stderr = proc.communicate(timeout=2)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    stdout, stderr = proc.communicate()
+                raise FfmpegCancelled("ffmpeg cancelled")
+            try:
+                stdout, stderr = proc.communicate(timeout=0.2)
+            except subprocess.TimeoutExpired:
+                continue
+        if proc.stdout is not None or proc.stderr is not None:
+            stdout, stderr = proc.communicate()
+        else:
+            stdout, stderr = b"", b""
+        result = subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
     if result.returncode != 0:
         stderr = result.stderr.decode("utf-8", errors="replace").strip()
         stdout = result.stdout.decode("utf-8", errors="replace").strip()

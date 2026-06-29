@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 from PIL import Image
 from services.ffmpeg_runner import run_ffmpeg
 from utils.colors import hex_to_rgb, make_gradient
@@ -37,7 +37,17 @@ def image_fit(src: Path, size: tuple[int, int]) -> Image.Image:
     return img.crop((x, y, x + tw, y + th))
 
 
-def extract_video_frames(src: Path, out_dir: Path, size: tuple[int, int], fps: int, frames_needed: int) -> list[Path]:
+CancelCb = Callable[[], bool]
+
+
+def extract_video_frames(
+    src: Path,
+    out_dir: Path,
+    size: tuple[int, int],
+    fps: int,
+    frames_needed: int,
+    cancelled: CancelCb | None = None,
+) -> list[Path]:
     """
     Достать `frames_needed` кадров из видео с заданным FPS, отмасштабировав
     их под размер холста (cover).
@@ -56,7 +66,7 @@ def extract_video_frames(src: Path, out_dir: Path, size: tuple[int, int], fps: i
         "-frames:v", str(frames_needed),
         str(pattern),
     ]
-    run_ffmpeg(cmd)
+    run_ffmpeg(cmd, cancelled=cancelled)
     return sorted(out_dir.glob("bg_*.png"))
 
 
@@ -67,6 +77,7 @@ def iter_background(
     frame_count: int,
     src_file: Path | None,
     work_dir: Path,
+    cancelled: CancelCb | None = None,
 ) -> Iterable[Image.Image]:
     """Генератор фоновых кадров (по одному на каждый кадр анимации)."""
     mode = bg_cfg["mode"]
@@ -83,7 +94,7 @@ def iter_background(
         for _ in range(frame_count):
             yield bg.copy()
     elif mode == "video" and src_file and src_file.exists():
-        paths = extract_video_frames(src_file, work_dir / "bgframes", size, fps, frame_count)
+        paths = extract_video_frames(src_file, work_dir / "bgframes", size, fps, frame_count, cancelled=cancelled)
         if not paths:                                            # фолбэк
             bg = solid(size, "#000000")
             for _ in range(frame_count):

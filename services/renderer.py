@@ -25,6 +25,7 @@ from services import (
     tgs_processor, sticker_processor, emoji_renderer,
     background_builder, watermark_engine, encoder,
 )
+from services.ffmpeg_runner import FfmpegCancelled
 
 
 ProgressCb = Callable[[str, int], None]
@@ -183,22 +184,6 @@ def _raise_if_cancelled(cancelled: CancelCb | None) -> None:
         raise RenderCancelled("Render cancelled")
 
 
-def _scaled_preview_size(width: int, height: int, max_side: int = 512) -> tuple[int, int]:
-    scale = min(1.0, max_side / max(width, height, 1))
-    return max(1, int(width * scale)), max(1, int(height * scale))
-
-
-def _copy_preview_settings(settings: dict) -> dict:
-    import copy
-
-    preview = copy.deepcopy(settings)
-    out = preview["output"]
-    out["width"], out["height"] = _scaled_preview_size(int(out["width"]), int(out["height"]))
-    out["format"] = "png"
-    out["fps"] = 1
-    return preview
-
-
 def render(
     settings: dict,
     input_path: Path | None,
@@ -292,6 +277,7 @@ def render(
                 bg_color=settings["background"]["color"],
                 quality=out["quality"],
                 speed=float(out.get("speed", 1.0)),
+                cancelled=cancelled,
             )
             _raise_if_cancelled(cancelled)
             if progress:
@@ -303,7 +289,7 @@ def render(
         # ── 2. Фоновые кадры ─────────────────────────────────
         bg_iter = background_builder.iter_background(
             settings["background"], (W, H), target_fps,
-            frame_count, bg_path, work,
+            frame_count, bg_path, work, cancelled=cancelled,
         )
         _raise_if_cancelled(cancelled)
 
@@ -365,6 +351,7 @@ def render(
             speed=float(out.get("speed", 1.0)),
             width=W,
             height=H,
+            cancelled=cancelled,
         )
         _raise_if_cancelled(cancelled)
 
@@ -375,6 +362,8 @@ def render(
             raise RuntimeError("Encoder produced empty file (check ffmpeg installation)")
         return out_file
 
+    except FfmpegCancelled as exc:
+        raise RenderCancelled("Render cancelled") from exc
     except Exception:
         # Оставляем папку для диагностики, но прокидываем ошибку выше
         raise
@@ -384,20 +373,3 @@ def render(
             p = work / sub
             if p.exists():
                 shutil.rmtree(p, ignore_errors=True)
-
-
-def render_preview(
-    settings: dict,
-    input_path: Path | None,
-    bg_path: Path | None,
-    wm_image_path: Path | None,
-) -> Path:
-    """Render a lightweight PNG preview using the same composition pipeline."""
-    return render(
-        _copy_preview_settings(settings),
-        input_path,
-        bg_path,
-        wm_image_path,
-        progress=None,
-        cancelled=None,
-    )

@@ -4,7 +4,10 @@
 """
 from __future__ import annotations
 from pathlib import Path
+from typing import Callable
 from services.ffmpeg_runner import run_ffmpeg
+
+CancelCb = Callable[[], bool]
 
 _QUALITY_MAP = {
     # CRF для libx264 / libvpx-vp9 (ниже = качественнее)
@@ -24,6 +27,7 @@ def encode(
     speed: float = 1.0,
     width: int | None = None,
     height: int | None = None,
+    cancelled: CancelCb | None = None,
 ) -> Path:
     """
     frames_pattern: `…/frame_%04d.png`
@@ -48,13 +52,15 @@ def encode(
         run_ffmpeg(
             ["-y", "-framerate", f"{input_fps:.3f}", "-i", frames_pattern,
              "-vf", f"fps={output_fps},format=rgb24,palettegen=stats_mode={palette_stats}:max_colors=256",
-             str(palette)]
+             str(palette)],
+            cancelled=cancelled,
         )
         run_ffmpeg(
             ["-y", "-framerate", f"{input_fps:.3f}", "-i", frames_pattern,
              "-i", str(palette),
              "-lavfi", f"fps={output_fps},format=rgb24[x];[x][1:v]paletteuse=dither={dither}:diff_mode=rectangle",
-             "-loop", "0", str(out_path)]
+             "-loop", "0", str(out_path)],
+            cancelled=cancelled,
         )
         if palette.exists():
             try:
@@ -74,7 +80,7 @@ def encode(
             "-movflags", "+faststart",
             str(out_path),
         ]
-        run_ffmpeg(cmd)
+        run_ffmpeg(cmd, cancelled=cancelled)
         return out_path
 
     if fmt == "webm":
@@ -86,7 +92,7 @@ def encode(
             "-vf", f"fps={output_fps}",
             str(out_path),
         ]
-        run_ffmpeg(cmd)
+        run_ffmpeg(cmd, cancelled=cancelled)
         return out_path
 
     raise ValueError(f"Unsupported format: {fmt}")
@@ -102,6 +108,7 @@ def encode_centered_on_color(
     bg_color: str,
     quality: str = "high",
     speed: float = 1.0,
+    cancelled: CancelCb | None = None,
 ) -> Path:
     """Fast path: let ffmpeg scale, pad and encode source frames on a solid background."""
     if fmt not in {"mp4", "webm"}:
@@ -141,5 +148,5 @@ def encode_centered_on_color(
             "-deadline", "realtime", "-cpu-used", "8", "-row-mt", "1", "-threads", "0",
             str(out_path),
         ]
-    run_ffmpeg(cmd)
+    run_ffmpeg(cmd, cancelled=cancelled)
     return out_path

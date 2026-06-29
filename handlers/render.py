@@ -199,51 +199,6 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
     _cancel_flags.pop(uid, None)
 
 
-async def preview_for_message(message, bot: Bot, uid: int) -> None:
-    s = state.get(uid)
-    lang = s["lang"]
-
-    if not s["input"].get("type"):
-        await message.answer(t(lang, "no_input"), parse_mode="HTML")
-        return
-
-    status = await message.answer(t(lang, "preview_start"), parse_mode="HTML")
-    loop = asyncio.get_running_loop()
-    try:
-        preview_path: Path = await loop.run_in_executor(
-            None,
-            lambda: renderer.render_preview(
-                s,
-                _find_input(uid, s),
-                _find_bg(uid, s),
-                _find_wm_image(uid, s),
-            ),
-        )
-    except Exception as e:
-        try:
-            await status.edit_text(
-                t(lang, "render_error", err=escape(str(e)[:200])),
-                parse_mode="HTML",
-            )
-        except Exception:
-            await message.answer(t(lang, "render_error", err=escape(str(e)[:200])), parse_mode="HTML")
-        return
-
-    try:
-        await status.delete()
-    except Exception:
-        pass
-
-    file = FSInputFile(str(preview_path))
-    await message.answer_photo(
-        file,
-        caption=t(lang, "preview_ready"),
-        parse_mode="HTML",
-        reply_markup=keyboards.preview_result(lang),
-    )
-    shutil.rmtree(preview_path.parent, ignore_errors=True)
-
-
 @router.callback_query(F.data == "main:render")
 async def cb_render(call: CallbackQuery, bot: Bot):
     await call.answer()

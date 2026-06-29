@@ -360,12 +360,3 @@ def render_result(lang: str) -> InlineKeyboardMarkup:
     kb.adjust(2)
     return kb.as_markup()
 
-
-def preview_result(lang: str) -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    _add(kb, kt(lang, "btn_render"), "main:render", icon="🌀", style="success")
-    _add(kb, kt(lang, "btn_settings"), "out:menu", icon="📐", style="primary")
-    _add(kb, kt(lang, "btn_background"), "bg:menu", icon="🎨", style="primary")
-    _add(kb, kt(lang, "btn_watermark"), "wm:menu", icon="💧", style="primary")
-    kb.adjust(1, 3)
-    return kb.as_markup()

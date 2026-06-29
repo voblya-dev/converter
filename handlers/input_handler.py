@@ -23,7 +23,7 @@ from utils.i18n import t
 from utils.premium_emoji import premiumize_text
 from utils.colors import parse_hex
 from handlers.start import main_menu_text
-from handlers.render import preview_for_message
+from handlers.render import render_for_message
 
 router = Router(name="input")
 
@@ -81,7 +81,7 @@ async def _accept_premium_emoji_sticker(message: Message, bot: Bot, st) -> None:
         if s["output"].get("format") == "png":
             s["output"]["format"] = "mp4"
         state.save(uid)
-        await preview_for_message(message, bot, uid)
+        await render_for_message(message, bot, uid)
         return
 
     await _accept_sticker(message, bot, st)
@@ -136,7 +136,7 @@ async def _accept_sticker(message: Message, bot: Bot, st) -> None:
         s["output"]["format"] = "mp4"
     state.save(uid)
 
-    await preview_for_message(message, bot, uid)
+    await render_for_message(message, bot, uid)
 
 
 # ─────────────── СТИКЕРЫ ───────────────
@@ -416,7 +416,7 @@ async def on_text(message: Message, bot: Bot):
         s["input"]["file_id"] = None
         s["output"]["format"] = "png"
         state.save(uid)
-        await preview_for_message(message, bot, uid)
+        await render_for_message(message, bot, uid)
         return
 
     # 7) Иначе — подсказка
