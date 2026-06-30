@@ -52,6 +52,37 @@ class CoreChecks(unittest.TestCase):
         with Image.open(result) as img:
             self.assertEqual(img.size, (128, 128))
 
+    def test_auto_palette_uses_single_source_color(self):
+        from handlers.input_handler import _auto_palette_pair
+
+        color1, color2 = _auto_palette_pair(["#E00000"])
+        self.assertEqual(color1, "#E00000")
+        self.assertNotEqual(color2, "#0B5CAD")
+        r, g, b = tuple(int(color2.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+        self.assertGreater(r, g)
+        self.assertGreater(r, b)
+
+    def test_auto_colorize_does_not_use_stale_image_background_color(self):
+        settings = self.state.reset(4242424244)
+        settings["input"]["type"] = "emoji"
+        settings["input"]["emoji"] = "🔴"
+        settings["input"]["colorize"]["enabled"] = True
+        settings["input"]["colorize"]["auto"] = True
+        settings["background"]["mode"] = "global_image"
+        settings["background"]["color"] = "#0000FF"
+        settings["output"]["format"] = "png"
+        settings["output"]["width"] = 128
+        settings["output"]["height"] = 128
+        result = self.renderer.render(settings, None, None, None)
+        with Image.open(result).convert("RGBA") as img:
+            pixels = [
+                (r, g, b)
+                for r, g, b, a in img.getdata()
+                if a > 0 and (r, g, b) != (0, 0, 0)
+            ]
+        avg = tuple(sum(p[i] for p in pixels) / len(pixels) for i in range(3))
+        self.assertGreater(avg[0], avg[2])
+
 
 if __name__ == "__main__":
     unittest.main()

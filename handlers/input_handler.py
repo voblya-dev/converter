@@ -21,7 +21,7 @@ from config import ADMIN_ID, BACKGROUNDS_DIR, TMP_DIR, FONTS_DIR, MAX_UPLOAD_MB
 from utils import state, keyboards
 from utils.i18n import t
 from utils.premium_emoji import premiumize_text
-from utils.colors import parse_hex
+from utils.colors import hex_to_rgb, parse_hex, rgb_to_hex
 from utils.files import find_input
 from handlers.start import main_menu_text
 from handlers.render import render_for_message
@@ -51,24 +51,32 @@ async def _telegram_file_path(bot: Bot, file_id: str) -> str:
     return f.file_path or ""
 
 
+def _mix_rgb(c1: tuple[int, int, int], c2: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
+    amount = max(0.0, min(1.0, amount))
+    return tuple(int(c1[i] * (1.0 - amount) + c2[i] * amount) for i in range(3))
+
+
+def _auto_palette_pair(colors: list[str]) -> tuple[str, str]:
+    if len(colors) >= 2:
+        return colors[0], colors[1]
+    if colors:
+        base = hex_to_rgb(colors[0])
+        luminance = 0.2126 * base[0] + 0.7152 * base[1] + 0.0722 * base[2]
+        accent = _mix_rgb(base, (255, 255, 255), 0.32) if luminance < 120 else _mix_rgb(base, (0, 0, 0), 0.28)
+        return colors[0], rgb_to_hex(accent)
+    return "#202124", "#3C4043"
+
+
 def _apply_auto_palette(uid: int, s: dict) -> None:
     if not s["background"].get("auto_palette"):
         return
     colors = extract_palette(s["input"].get("type"), find_input(uid, s), s["input"].get("emoji"))
-    if len(colors) < 2:
-        s["background"].update({
-            "mode": "gradient",
-            "auto_palette": True,
-            "color": "#229ED9",
-            "color2": "#0B5CAD",
-            "direction": "diagonal",
-        })
-        return
+    color1, color2 = _auto_palette_pair(colors)
     s["background"].update({
         "mode": "gradient",
         "auto_palette": True,
-        "color": colors[0],
-        "color2": colors[1],
+        "color": color1,
+        "color2": color2,
         "direction": "diagonal",
     })
 

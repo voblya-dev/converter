@@ -140,7 +140,7 @@ def _colorize_source(img: Image.Image, cfg: dict) -> Image.Image:
     return Image.fromarray(out, "RGBA")
 
 
-def _background_tint_color(settings: dict) -> str:
+def _background_tint_color(settings: dict) -> str | None:
     bg = settings.get("background", {})
     mode = bg.get("mode")
     if mode == "gradient":
@@ -150,7 +150,7 @@ def _background_tint_color(settings: dict) -> str:
         return rgb_to_hex(avg)
     if mode == "color":
         return bg.get("color", "#FFFFFF")
-    return bg.get("color", "#FFFFFF")
+    return None
 
 
 def _compose_frame(
@@ -169,7 +169,11 @@ def _compose_frame(
         src_img = src.convert("RGBA")
     colorize_cfg = dict(settings["input"].get("colorize", {}))
     if colorize_cfg.get("auto"):
-        colorize_cfg["color"] = _background_tint_color(settings)
+        tint = _background_tint_color(settings)
+        if tint:
+            colorize_cfg["color"] = tint
+        else:
+            colorize_cfg["enabled"] = False
     src_img = _colorize_source(src_img, colorize_cfg)
     inner_w = int(W * input_size_pct / 100)
     inner_h = int(H * input_size_pct / 100)
