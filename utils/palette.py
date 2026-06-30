@@ -1,7 +1,10 @@
 """Extract simple color palettes from user source files."""
 from __future__ import annotations
 
+import gzip
+import json
 import shutil
+from collections import Counter
 from pathlib import Path
 from PIL import Image
 
@@ -59,6 +62,67 @@ def _dominant_colors_from_paths(paths: list[Path], limit: int = 3) -> list[str]:
     return colors
 
 
+def _normalize_lottie_rgb(values: list[float | int]) -> tuple[int, int, int] | None:
+    if len(values) < 3:
+        return None
+    rgb = list(values[:3])
+    if all(0 <= float(c) <= 1 for c in rgb):
+        rgb = [float(c) * 255 for c in rgb]
+    result = tuple(max(0, min(255, int(round(float(c))))) for c in rgb)
+    r, g, b = result
+    if r > 245 and g > 245 and b > 245:
+        return None
+    if r < 12 and g < 12 and b < 12:
+        return None
+    return result
+
+
+def _lottie_color_values(node) -> list[tuple[int, int, int]]:
+    colors: list[tuple[int, int, int]] = []
+    if isinstance(node, dict):
+        if node.get("ty") in {"fl", "st"}:
+            rgb = _normalize_lottie_rgb(((node.get("c") or {}).get("k") or []))
+            if rgb:
+                colors.append(rgb)
+        if node.get("ty") == "gf":
+            stops = (((node.get("g") or {}).get("k") or {}).get("k") or [])
+            if isinstance(stops, list):
+                for i in range(0, len(stops) - 3, 4):
+                    rgb = _normalize_lottie_rgb(stops[i + 1:i + 4])
+                    if rgb:
+                        colors.append(rgb)
+        for value in node.values():
+            colors.extend(_lottie_color_values(value))
+    elif isinstance(node, list):
+        for value in node:
+            colors.extend(_lottie_color_values(value))
+    return colors
+
+
+def _dominant_colors_from_lottie(path: Path, limit: int = 3) -> list[str]:
+    raw = path.read_bytes()
+    if raw[:2] == b"\x1f\x8b":
+        raw = gzip.decompress(raw)
+    data = json.loads(raw)
+    counts = Counter(_lottie_color_values(data))
+    if not counts:
+        return []
+
+    def score(item: tuple[tuple[int, int, int], int]) -> float:
+        (r, g, b), count = item
+        saturation = max(r, g, b) - min(r, g, b)
+        brightness = (r + g + b) / 3
+        return count * (1.0 + saturation / 96.0) * (0.75 + min(brightness, 220) / 440.0)
+
+    result: list[tuple[int, int, int]] = []
+    for color, _count in sorted(counts.items(), key=score, reverse=True):
+        if all(sum(abs(color[i] - old[i]) for i in range(3)) > 80 for old in result):
+            result.append(color)
+        if len(result) >= limit:
+            break
+    return [_rgb_to_hex(color) for color in result]
+
+
 def extract_palette(input_type: str | None, src_file: Path | None, emoji: str | None = None) -> list[str]:
     work = TMP_DIR / "palette_extract"
     shutil.rmtree(work, ignore_errors=True)
@@ -70,6 +134,9 @@ def extract_palette(input_type: str | None, src_file: Path | None, emoji: str | 
             frames = sticker_processor.render_webm_to_frames(src_file, work, max_frames=5)
             return _dominant_colors_from_paths(frames)
         if input_type == "tgs" and src_file and src_file.exists():
+            colors = _dominant_colors_from_lottie(src_file)
+            if colors:
+                return colors
             frames, _fps = tgs_processor.render_tgs_to_frames(src_file, work, max_frames=5, target_fps=5)
             return _dominant_colors_from_paths(frames)
         if input_type == "emoji":

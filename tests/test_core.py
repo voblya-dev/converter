@@ -73,6 +73,34 @@ class CoreChecks(unittest.TestCase):
         self.assertGreater(g, r)
         self.assertGreater(g, b)
 
+    def test_tgs_palette_reads_lottie_fill_colors(self):
+        from utils.palette import _dominant_colors_from_lottie
+        import gzip
+        import json
+
+        payload = {
+            "v": "5.7.4",
+            "w": 512,
+            "h": 512,
+            "fr": 30,
+            "ip": 0,
+            "op": 30,
+            "layers": [{
+                "ty": 4,
+                "shapes": [
+                    {"ty": "fl", "c": {"k": [0.0, 0.72, 0.0, 1]}},
+                    {"ty": "st", "c": {"k": [0.1, 0.35, 0.1, 1]}},
+                ],
+            }],
+        }
+        path = Path(self.tmp.name) / "green.tgs"
+        path.write_bytes(gzip.compress(json.dumps(payload).encode("utf-8")))
+        colors = _dominant_colors_from_lottie(path)
+        self.assertTrue(colors)
+        r, g, b = tuple(int(colors[0].lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+        self.assertGreater(g, r)
+        self.assertGreater(g, b)
+
     def test_auto_palette_icon_is_premiumized(self):
         from utils.i18n import t
 
