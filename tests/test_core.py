@@ -136,6 +136,22 @@ class CoreChecks(unittest.TestCase):
         self.assertGreater(g, r)
         self.assertGreater(g, b)
 
+    def test_auto_palette_unknown_emoji_does_not_keep_previous_green(self):
+        from utils.auto_palette import apply_auto_palette
+
+        settings = self.state.reset(4242424249)
+        settings["background"]["auto_palette"] = True
+        settings["input"]["type"] = "emoji"
+        settings["input"]["emoji"] = "🟢"
+        apply_auto_palette(settings, None)
+        settings["input"]["emoji"] = "😀"
+        apply_auto_palette(settings, None)
+        self.assertNotEqual(settings["background"]["color"], "#00AA00")
+        r, g, b = tuple(int(settings["background"]["color"].lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+        self.assertGreater(r, 180)
+        self.assertGreater(g, 140)
+        self.assertLess(b, 90)
+
     def test_async_auto_palette_recomputes_for_each_emoji(self):
         from utils.auto_palette import apply_auto_palette_async
 

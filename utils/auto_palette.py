@@ -29,11 +29,13 @@ def emoji_palette_hint(emoji_text: str | None) -> list[str]:
         return []
     hints = [
         ("🟢💚✅☘🍀🥬🥦🌲🌳🌿", "#00AA00"),
-        ("🔴❤️❤♥🌹🍎🍓🍒", "#E53935"),
+        ("🔴❤️❤♥🌹🍎🍓🍒🛑❌", "#E53935"),
         ("🔵💙🫐", "#1E88E5"),
-        ("🟡💛⭐🌟✨🌕🍋", "#FDD835"),
+        ("🟡💛⭐🌟✨🌕🍋😀😃😄😁🙂😊😇🥳😍😘😋😎🤩🤔🤗😂🤣😭😅😆😉😌😐😑😶🙄😬🤥😴🤤😪😵🤐🤑🤠", "#FDD835"),
         ("🟠🧡🍊🔥", "#FB8C00"),
-        ("🟣💜🍇", "#8E24AA"),
+        ("🟣💜🍇😈👿☂️☔", "#8E24AA"),
+        ("🩷💕💞💓💗💖💘🌸", "#EC407A"),
+        ("🤎🟤🍫", "#6D4C41"),
         ("⚫🖤", "#202124"),
         ("⚪🤍", "#F1F3F4"),
     ]
@@ -45,9 +47,13 @@ def emoji_palette_hint(emoji_text: str | None) -> list[str]:
 
 
 def resolve_auto_palette(input_type: str | None, src_file: Path | None, emoji: str | None) -> tuple[str, str] | None:
-    colors = extract_palette(input_type, src_file, emoji)
+    colors = emoji_palette_hint(emoji) if input_type == "emoji" else []
     if not colors:
+        colors = extract_palette(input_type, src_file, emoji)
+    if not colors and input_type != "emoji":
         colors = emoji_palette_hint(emoji)
+    if not colors and input_type == "emoji":
+        colors = ["#FDD835"]
     if not colors:
         return None
     return auto_palette_pair(colors)
@@ -76,9 +82,13 @@ def apply_auto_palette(settings: dict, src_file: Path | None = None) -> bool:
 
 
 async def resolve_auto_palette_async(input_type: str | None, src_file: Path | None, emoji: str | None) -> tuple[str, str] | None:
-    colors = await asyncio.to_thread(extract_palette, input_type, src_file, emoji)
+    colors = emoji_palette_hint(emoji) if input_type == "emoji" else []
     if not colors:
+        colors = await asyncio.to_thread(extract_palette, input_type, src_file, emoji)
+    if not colors and input_type != "emoji":
         colors = emoji_palette_hint(emoji)
+    if not colors and input_type == "emoji":
+        colors = ["#FDD835"]
     if not colors:
         return None
     return auto_palette_pair(colors)
