@@ -32,7 +32,7 @@ TMP_MAX_AGE_HOURS = int(os.getenv("TMP_MAX_AGE_HOURS", "24"))
 MAX_RENDER_SECONDS = int(os.getenv("MAX_RENDER_SECONDS", "180"))
 MAX_RENDER_FRAMES = int(os.getenv("MAX_RENDER_FRAMES", "180"))
 MAX_PARALLEL_RENDERS = int(os.getenv("MAX_PARALLEL_RENDERS", "2"))
-MAX_USER_QUEUE = int(os.getenv("MAX_USER_QUEUE", "5"))
+MAX_USER_QUEUE = int(os.getenv("MAX_USER_QUEUE", "0"))  # 0 = unlimited per-user queue
 
 # ───────── Палитра (20 цветов) ─────────
 COLOR_PALETTE = [

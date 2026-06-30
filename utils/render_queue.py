@@ -80,7 +80,7 @@ async def enqueue_render(user_id: int) -> RenderTicket:
     ticket = RenderTicket(user_id=user_id)
     async with _lock:
         queue = _queues[user_id]
-        if len(queue) >= max(1, MAX_USER_QUEUE):
+        if MAX_USER_QUEUE > 0 and len(queue) >= MAX_USER_QUEUE:
             raise RenderQueueFull("Render queue is full for this user")
         queue.append(ticket)
         if len(queue) == 1:

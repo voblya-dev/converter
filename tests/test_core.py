@@ -192,6 +192,21 @@ class CoreChecks(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_render_queue_accepts_more_than_old_limit(self):
+        async def scenario():
+            from utils.render_queue import enqueue_render
+
+            uid = 989899
+            tickets = [await enqueue_render(uid) for _ in range(8)]
+            try:
+                self.assertEqual(await tickets[0].position(), 1)
+                self.assertEqual(await tickets[-1].position(), 8)
+            finally:
+                for ticket in tickets:
+                    await ticket.release()
+
+        asyncio.run(scenario())
+
     def test_render_snapshot_keeps_original_input_file(self):
         from handlers.render import _snapshot_render_job
 

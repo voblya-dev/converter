@@ -280,28 +280,38 @@ async def _render_for_message_locked(
 
     await anim_task
 
-    try:
-        await progress_msg.delete()
-    except Exception:
-        pass
-
     fmt = result_path.suffix.lstrip(".").lower() or s["output"]["format"]
     file = FSInputFile(str(result_path))
     result_kb = keyboards.render_result(lang)
     summary = _result_summary(result_path, s, input_path, lang)
-    if fmt == "gif":
-        await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
-    elif fmt == "mp4":
-        await message.answer_video(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
-    elif fmt == "webm":
-        await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
-    elif fmt == "png":
-        await message.answer_photo(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
-    else:
-        await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
+    try:
+        if fmt == "gif":
+            await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
+        elif fmt == "mp4":
+            await message.answer_video(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
+        elif fmt == "webm":
+            await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
+        elif fmt == "png":
+            await message.answer_photo(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
+        else:
+            await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
+    except Exception as e:
+        try:
+            await progress_msg.edit_text(
+                t(lang, "render_error", err=escape(str(e)[:200])),
+                parse_mode="HTML",
+            )
+        except Exception:
+            await message.answer(t(lang, "render_error", err=escape(str(e)[:200])), parse_mode="HTML")
+        return
+    finally:
+        shutil.rmtree(result_path.parent, ignore_errors=True)
+        _cancel_flags.pop(uid, None)
 
-    shutil.rmtree(result_path.parent, ignore_errors=True)
-    _cancel_flags.pop(uid, None)
+    try:
+        await progress_msg.delete()
+    except Exception:
+        pass
 
 
 @router.callback_query(F.data == "main:render")
