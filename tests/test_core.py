@@ -54,9 +54,9 @@ class CoreChecks(unittest.TestCase):
             self.assertEqual(img.size, (128, 128))
 
     def test_auto_palette_uses_single_source_color(self):
-        from handlers.input_handler import _auto_palette_pair
+        from utils.auto_palette import auto_palette_pair
 
-        color1, color2 = _auto_palette_pair(["#E00000"])
+        color1, color2 = auto_palette_pair(["#E00000"])
         self.assertEqual(color1, "#E00000")
         self.assertNotEqual(color2, "#0B5CAD")
         r, g, b = tuple(int(color2.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
@@ -80,16 +80,33 @@ class CoreChecks(unittest.TestCase):
         self.assertIn("tg-emoji", rendered)
 
     def test_empty_auto_palette_does_not_replace_background_with_gray(self):
-        from handlers.input_handler import _apply_auto_palette
+        from utils.auto_palette import apply_auto_palette
 
         settings = self.state.reset(4242424245)
         settings["background"]["auto_palette"] = True
         settings["background"]["color"] = "#00AA00"
         settings["background"]["color2"] = "#006600"
         settings["input"]["type"] = "missing"
-        _apply_auto_palette(4242424245, settings)
+        apply_auto_palette(settings, None)
         self.assertEqual(settings["background"]["color"], "#00AA00")
         self.assertEqual(settings["background"]["color2"], "#006600")
+
+    def test_auto_palette_recomputes_for_each_emoji(self):
+        from utils.auto_palette import apply_auto_palette
+
+        settings = self.state.reset(4242424247)
+        settings["background"]["auto_palette"] = True
+        settings["input"]["type"] = "emoji"
+        settings["input"]["emoji"] = "🔴"
+        apply_auto_palette(settings, None)
+        red = settings["background"]["color"]
+        settings["input"]["emoji"] = "🟢"
+        apply_auto_palette(settings, None)
+        green = settings["background"]["color"]
+        self.assertNotEqual(red, green)
+        r, g, b = tuple(int(green.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+        self.assertGreater(g, r)
+        self.assertGreater(g, b)
 
     def test_auto_colorize_does_not_use_stale_image_background_color(self):
         settings = self.state.reset(4242424244)
