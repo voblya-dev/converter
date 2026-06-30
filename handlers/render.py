@@ -20,6 +20,7 @@ from pathlib import Path
 from html import escape
 
 from aiogram import Router, F, Bot
+from aiogram.exceptions import TelegramRetryAfter
 from aiogram.types import CallbackQuery, FSInputFile
 
 from config import MAX_RENDER_SECONDS, TMP_DIR
@@ -36,6 +37,18 @@ router = Router(name="render")
 
 # хранилище «отмена» по user_id
 _cancel_flags: dict[int, bool] = {}
+
+
+async def _telegram_retry(factory, attempts: int = 5):
+    last_exc = None
+    for _ in range(max(1, attempts)):
+        try:
+            return await factory()
+        except TelegramRetryAfter as exc:
+            last_exc = exc
+            await asyncio.sleep(max(1, int(exc.retry_after)) + 1)
+    if last_exc:
+        raise last_exc
 
 
 def _copy_optional(src: Path | None, dst_dir: Path, name: str) -> Path | None:
@@ -144,13 +157,16 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
             while await ticket.position() > 1:
                 new_position = await ticket.position()
                 try:
-                    await queue_msg.edit_text(
-                        t(lang, "render_queued", position=new_position),
-                        parse_mode="HTML",
+                    await _telegram_retry(
+                        lambda: queue_msg.edit_text(
+                            t(lang, "render_queued", position=new_position),
+                            parse_mode="HTML",
+                        ),
+                        attempts=2,
                     )
                 except Exception:
                     pass
-                await asyncio.sleep(2)
+                await asyncio.sleep(4)
             try:
                 await queue_msg.delete()
             except Exception:
@@ -222,9 +238,12 @@ async def _render_for_message_locked(
             txt = t(lang, key, bar=bar(cur), pct=cur)
             if txt != last_text:
                 try:
-                    await progress_msg.edit_text(
-                        txt, parse_mode="HTML",
-                        reply_markup=keyboards.cancel_render(lang),
+                    await _telegram_retry(
+                        lambda: progress_msg.edit_text(
+                            txt, parse_mode="HTML",
+                            reply_markup=keyboards.cancel_render(lang),
+                        ),
+                        attempts=2,
                     )
                     last_text = txt
                 except Exception:
@@ -254,26 +273,33 @@ async def _render_for_message_locked(
         _cancel_flags[uid] = True
         progress_state["done"] = True
         await anim_task
-        await progress_msg.edit_text(t(lang, "render_timeout"), parse_mode="HTML")
+        await _telegram_retry(lambda: progress_msg.edit_text(t(lang, "render_timeout"), parse_mode="HTML"))
         return
     except renderer.RenderCancelled:
         progress_state["done"] = True
         await anim_task
         try:
-            await progress_msg.edit_text(t(lang, "render_cancelled"), parse_mode="HTML")
+            await _telegram_retry(lambda: progress_msg.edit_text(t(lang, "render_cancelled"), parse_mode="HTML"))
         except Exception:
-            await message.answer(t(lang, "render_cancelled"), parse_mode="HTML")
+            await _telegram_retry(lambda: message.answer(t(lang, "render_cancelled"), parse_mode="HTML"))
         return
     except Exception as e:
         progress_state["done"] = True
         await anim_task
         try:
-            await progress_msg.edit_text(
-                t(lang, "render_error", err=escape(str(e)[:200])),
-                parse_mode="HTML",
+            await _telegram_retry(
+                lambda: progress_msg.edit_text(
+                    t(lang, "render_error", err=escape(str(e)[:200])),
+                    parse_mode="HTML",
+                )
             )
         except Exception:
-            await message.answer(t(lang, "render_error", err=escape(str(e)[:200])), parse_mode="HTML")
+            try:
+                await _telegram_retry(
+                    lambda: message.answer(t(lang, "render_error", err=escape(str(e)[:200])), parse_mode="HTML")
+                )
+            except Exception:
+                pass
         return
     finally:
         progress_state["done"] = True
@@ -286,23 +312,30 @@ async def _render_for_message_locked(
     summary = _result_summary(result_path, s, input_path, lang)
     try:
         if fmt == "gif":
-            await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
+            await _telegram_retry(lambda: message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb))
         elif fmt == "mp4":
-            await message.answer_video(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
+            await _telegram_retry(lambda: message.answer_video(file, caption=summary, parse_mode="HTML", reply_markup=result_kb))
         elif fmt == "webm":
-            await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
+            await _telegram_retry(lambda: message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb))
         elif fmt == "png":
-            await message.answer_photo(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
+            await _telegram_retry(lambda: message.answer_photo(file, caption=summary, parse_mode="HTML", reply_markup=result_kb))
         else:
-            await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
+            await _telegram_retry(lambda: message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb))
     except Exception as e:
         try:
-            await progress_msg.edit_text(
-                t(lang, "render_error", err=escape(str(e)[:200])),
-                parse_mode="HTML",
+            await _telegram_retry(
+                lambda: progress_msg.edit_text(
+                    t(lang, "render_error", err=escape(str(e)[:200])),
+                    parse_mode="HTML",
+                )
             )
         except Exception:
-            await message.answer(t(lang, "render_error", err=escape(str(e)[:200])), parse_mode="HTML")
+            try:
+                await _telegram_retry(
+                    lambda: message.answer(t(lang, "render_error", err=escape(str(e)[:200])), parse_mode="HTML")
+                )
+            except Exception:
+                pass
         return
     finally:
         shutil.rmtree(result_path.parent, ignore_errors=True)
