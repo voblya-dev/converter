@@ -86,7 +86,12 @@ def _ensure_pyrlottie_renderer_ready() -> None:
     package_dir = Path(pyrlottie.__file__).resolve().parent
     machine = platform.machine().lower()
     bin_dir = package_dir / f"linux_{machine}"
-    candidates = [bin_dir / "lottie2gif", bin_dir / "lottie2gif" / "app"]
+    candidates = [
+        bin_dir / "lottie2gif",
+        bin_dir / "gif2webp",
+        bin_dir / "lottie2gif" / "app",
+        bin_dir / "gif2webp" / "app",
+    ]
     binaries = [path for path in candidates if path.is_file()]
     if not binaries:
         if machine not in {"x86_64", "amd64", "aarch64", "arm64"}:
