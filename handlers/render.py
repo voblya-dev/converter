@@ -13,6 +13,7 @@
 from __future__ import annotations
 import asyncio
 import shutil
+import time
 from pathlib import Path
 from html import escape
 
@@ -24,6 +25,7 @@ from utils import state, keyboards
 from utils.files import find_background, find_input, find_watermark_image
 from utils.i18n import t
 from utils.progress import bar
+from utils.render_queue import RenderQueueFull, render_slot
 from services import renderer
 from services import sticker_processor, tgs_processor
 
@@ -96,6 +98,14 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
         await message.answer(t(lang, "no_input"), parse_mode="HTML")
         return
 
+    try:
+        async with render_slot(uid):
+            await _render_for_message_locked(message, bot, uid, s, lang)
+    except RenderQueueFull:
+        await message.answer(t(lang, "render_queue_full"), parse_mode="HTML")
+
+
+async def _render_for_message_locked(message, bot: Bot, uid: int, s: dict, lang: str) -> None:
     _cancel_flags[uid] = False
 
     # Стартовое сообщение
@@ -107,9 +117,14 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
 
     # Состояние прогресса, которое будет обновляться из колбэка рендера
     progress_state = {"stage": "frames", "pct": 0, "last_render_pct": 0}
+    deadline = time.monotonic() + max(1, MAX_RENDER_SECONDS)
+
     def progress_cb(stage: str, pct: int):
         progress_state["stage"] = stage
         progress_state["last_render_pct"] = pct
+
+    def is_cancelled() -> bool:
+        return _cancel_flags.get(uid, False) or time.monotonic() >= deadline
 
     async def animator():
         """Цикл, который раз в ~0.6 с обновляет сообщение прогресса."""
@@ -156,7 +171,7 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
                 find_background(uid, s),
                 find_watermark_image(uid, s),
                 progress_cb,
-                lambda: _cancel_flags.get(uid, False),
+                is_cancelled,
             ),
         )
 
