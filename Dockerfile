@@ -10,7 +10,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && find /usr/local/lib/python*/site-packages/pyrlottie -type f \( -name 'lottie2gif' -o -name 'app' \) -exec chmod 0755 {} +
 
 COPY . .
 

@@ -10,11 +10,14 @@ import asyncio
 import gzip
 import json
 import math
+import os
+import platform
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageChops
 
 try:
+    import pyrlottie  # type: ignore
     from pyrlottie import LottieFile, convSingleLottieFrames  # type: ignore
     _HAS_RLOTTIE = True
 except Exception:                                                  # pragma: no cover
@@ -72,6 +75,39 @@ def _render_lottie_frames(lf: LottieFile, background: str, frame_skip: int, scal
     return list(rendered[lf.path].frames)
 
 
+def _ensure_pyrlottie_renderer_ready() -> None:
+    """Validate pyrlottie's bundled native renderer before starting a job."""
+    if not _HAS_RLOTTIE:
+        return
+
+    if platform.system().lower() != "linux":
+        return
+
+    package_dir = Path(pyrlottie.__file__).resolve().parent
+    machine = platform.machine().lower()
+    bin_dir = package_dir / f"linux_{machine}"
+    candidates = [bin_dir / "lottie2gif", bin_dir / "lottie2gif" / "app"]
+    binaries = [path for path in candidates if path.is_file()]
+    if not binaries:
+        if machine not in {"x86_64", "amd64", "aarch64", "arm64"}:
+            raise RuntimeError(
+                f"pyrlottie has no bundled renderer for Linux {platform.machine()}. "
+                "Use an x86_64/amd64 or aarch64/arm64 VPS."
+            )
+        return
+
+    for binary in binaries:
+        if os.access(binary, os.X_OK):
+            continue
+        try:
+            binary.chmod(binary.stat().st_mode | 0o755)
+        except OSError as exc:
+            raise RuntimeError(
+                f"pyrlottie renderer is not executable: {binary}. "
+                "Rebuild the Docker image so Dockerfile can chmod it during install."
+            ) from exc
+
+
 def _frame_is_opaque_rgba(img: Image.Image) -> bool:
     return img.getchannel("A").getextrema() == (255, 255)
 
@@ -97,6 +133,7 @@ def render_tgs_to_frames(
 
     if not _HAS_RLOTTIE:
         raise RuntimeError("pyrlottie is not available, cannot render animated TGS stickers")
+    _ensure_pyrlottie_renderer_ready()
 
     # pyrlottie ожидает несжатый JSON
     raw = src.read_bytes()
