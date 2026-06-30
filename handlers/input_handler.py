@@ -67,12 +67,37 @@ def _auto_palette_pair(colors: list[str]) -> tuple[str, str]:
     raise ValueError("empty palette")
 
 
+def _emoji_palette_hint(emoji_text: str | None) -> list[str]:
+    if not emoji_text:
+        return []
+    hints = [
+        ("🟢💚✅☘🍀🥬🥦🌲🌳🌿", "#00AA00"),
+        ("🔴❤️❤♥🌹🍎🍓🍒", "#E53935"),
+        ("🔵💙🫐", "#1E88E5"),
+        ("🟡💛⭐🌟✨🌕🍋", "#FDD835"),
+        ("🟠🧡🍊🔥", "#FB8C00"),
+        ("🟣💜🍇", "#8E24AA"),
+        ("⚫🖤", "#202124"),
+        ("⚪🤍", "#F1F3F4"),
+    ]
+    chars = set(emoji_text)
+    for group, color in hints:
+        if chars.intersection(group):
+            return [color]
+    return []
+
+
 def _apply_auto_palette(uid: int, s: dict) -> None:
     if not s["background"].get("auto_palette"):
         return
     colors = extract_palette(s["input"].get("type"), find_input(uid, s), s["input"].get("emoji"))
     if not colors:
-        return
+        colors = _emoji_palette_hint(s["input"].get("emoji"))
+    if not colors:
+        current = (s["background"].get("color") or "#000000").upper()
+        if current not in {"#000000", "#202124", "#3C4043"}:
+            return
+        colors = ["#4A5568"]
     color1, color2 = _auto_palette_pair(colors)
     s["background"].update({
         "mode": "gradient",

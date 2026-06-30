@@ -12,15 +12,17 @@
 """
 from __future__ import annotations
 import asyncio
+import copy
 import shutil
 import time
+import uuid
 from pathlib import Path
 from html import escape
 
 from aiogram import Router, F, Bot
 from aiogram.types import CallbackQuery, FSInputFile
 
-from config import MAX_RENDER_SECONDS
+from config import MAX_RENDER_SECONDS, TMP_DIR
 from utils import state, keyboards
 from utils.files import find_background, find_input, find_watermark_image
 from utils.i18n import t
@@ -33,6 +35,24 @@ router = Router(name="render")
 
 # хранилище «отмена» по user_id
 _cancel_flags: dict[int, bool] = {}
+
+
+def _copy_optional(src: Path | None, dst_dir: Path, name: str) -> Path | None:
+    if not src or not src.exists():
+        return None
+    dst = dst_dir / f"{name}{src.suffix.lower()}"
+    shutil.copy2(src, dst)
+    return dst
+
+
+def _snapshot_render_job(uid: int, settings: dict) -> tuple[dict, Path | None, Path | None, Path | None, Path]:
+    snapshot = copy.deepcopy(settings)
+    job_dir = TMP_DIR / "queue" / uuid.uuid4().hex[:8]
+    job_dir.mkdir(parents=True, exist_ok=True)
+    input_path = _copy_optional(find_input(uid, snapshot), job_dir, "input")
+    bg_path = _copy_optional(find_background(uid, snapshot), job_dir, "background")
+    wm_path = _copy_optional(find_watermark_image(uid, snapshot), job_dir, "watermark")
+    return snapshot, input_path, bg_path, wm_path, job_dir
 
 
 def _format_bytes(value: int) -> str:
@@ -97,11 +117,17 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
     if not s["input"].get("type"):
         await message.answer(t(lang, "no_input"), parse_mode="HTML")
         return
+    job_settings, input_path, bg_path, wm_path, snapshot_dir = _snapshot_render_job(uid, s)
+    if s["input"].get("type") != "emoji" and input_path is None:
+        shutil.rmtree(snapshot_dir, ignore_errors=True)
+        await message.answer(t(lang, "no_input"), parse_mode="HTML")
+        return
 
     queue_msg = None
     try:
         ticket = await enqueue_render(uid)
     except RenderQueueFull:
+        shutil.rmtree(snapshot_dir, ignore_errors=True)
         await message.answer(t(lang, "render_queue_full"), parse_mode="HTML")
         return
 
@@ -123,18 +149,30 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
                     pass
                 await asyncio.sleep(2)
             try:
-                await queue_msg.edit_text(t(lang, "render_queue_start"), parse_mode="HTML")
+                await queue_msg.delete()
             except Exception:
                 pass
 
         await ticket.wait_until_ready()
         async with ticket:
-            await _render_for_message_locked(message, bot, uid, s, lang)
+            await _render_for_message_locked(
+                message, bot, uid, job_settings, lang, input_path, bg_path, wm_path
+            )
     finally:
         await ticket.release()
+        shutil.rmtree(snapshot_dir, ignore_errors=True)
 
 
-async def _render_for_message_locked(message, bot: Bot, uid: int, s: dict, lang: str) -> None:
+async def _render_for_message_locked(
+    message,
+    bot: Bot,
+    uid: int,
+    s: dict,
+    lang: str,
+    input_path: Path | None,
+    bg_path: Path | None,
+    wm_image_path: Path | None,
+) -> None:
     _cancel_flags[uid] = False
 
     # Стартовое сообщение
@@ -196,9 +234,9 @@ async def _render_for_message_locked(message, bot: Bot, uid: int, s: dict, lang:
             None,
             lambda: renderer.render(
                 s,
-                find_input(uid, s),
-                find_background(uid, s),
-                find_watermark_image(uid, s),
+                input_path,
+                bg_path,
+                wm_image_path,
                 progress_cb,
                 is_cancelled,
             ),
@@ -247,7 +285,7 @@ async def _render_for_message_locked(message, bot: Bot, uid: int, s: dict, lang:
     fmt = result_path.suffix.lstrip(".").lower() or s["output"]["format"]
     file = FSInputFile(str(result_path))
     result_kb = keyboards.render_result(lang)
-    summary = _result_summary(result_path, s, find_input(uid, s), lang)
+    summary = _result_summary(result_path, s, input_path, lang)
     if fmt == "gif":
         await message.answer_document(file, caption=summary, parse_mode="HTML", reply_markup=result_kb)
     elif fmt == "mp4":

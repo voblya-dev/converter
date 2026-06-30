@@ -111,6 +111,29 @@ class CoreChecks(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_render_snapshot_keeps_original_input_file(self):
+        from handlers.render import _snapshot_render_job
+
+        uid = 4242424246
+        settings = self.state.reset(uid)
+        settings["input"]["type"] = "sticker"
+        from utils.files import user_dir as get_user_dir
+
+        udir = get_user_dir(uid)
+        udir.mkdir(parents=True, exist_ok=True)
+        src = udir / "input.webp"
+        src.write_bytes(b"first")
+        snapshot, input_path, _bg, _wm, snapshot_dir = _snapshot_render_job(uid, settings)
+        try:
+            src.write_bytes(b"second")
+            self.assertEqual(snapshot["input"]["type"], "sticker")
+            self.assertIsNotNone(input_path)
+            self.assertEqual(input_path.read_bytes(), b"first")
+        finally:
+            import shutil
+
+            shutil.rmtree(snapshot_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()
