@@ -12,6 +12,7 @@ import json
 import math
 import os
 import platform
+import threading
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageChops
@@ -22,6 +23,8 @@ try:
     _HAS_RLOTTIE = True
 except Exception:                                                  # pragma: no cover
     _HAS_RLOTTIE = False
+
+_RLOTTIE_LOCK = threading.Lock()
 
 
 def _read_lottie_json(path: Path) -> dict:
@@ -69,9 +72,16 @@ def _restore_alpha(black: Image.Image, white: Image.Image) -> Image.Image:
 
 
 def _render_lottie_frames(lf: LottieFile, background: str, frame_skip: int, scale: float) -> list[Image.Image]:
-    rendered = asyncio.run(
-        convSingleLottieFrames(lf, backgroundColour=background, frameSkip=frame_skip, scale=scale)
-    )
+    async def _render() -> dict:
+        # pyrlottie stores a module-level asyncio.Semaphore. The bot renders in
+        # worker threads, so each asyncio.run() has a different event loop.
+        pyrlottie.SEM = asyncio.Semaphore(os.cpu_count() or 1)
+        return await convSingleLottieFrames(
+            lf, backgroundColour=background, frameSkip=frame_skip, scale=scale
+        )
+
+    with _RLOTTIE_LOCK:
+        rendered = asyncio.run(_render())
     return list(rendered[lf.path].frames)
 
 
@@ -177,12 +187,12 @@ def render_tgs_to_frames(
             if white_frames is None:
                 try:
                     white_frames = _render_lottie_frames(lf, "ffffff", frame_skip, scale)
-                except RuntimeError:
-                    white_frames = []
+                except RuntimeError as exc:
+                    raise RuntimeError(f"TGS alpha renderer failed: {exc}") from exc
             if white_frames:
                 rgba = _restore_alpha(black, white_frames[min(i, len(white_frames) - 1)])
             elif _frame_is_opaque_rgba(rgba):
-                rgba.putalpha(255)
+                raise RuntimeError("TGS renderer returned opaque frames and alpha restore was unavailable")
         canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         x = (width - rgba.width) // 2
         y = (height - rgba.height) // 2
