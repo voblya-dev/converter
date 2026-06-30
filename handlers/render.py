@@ -28,7 +28,7 @@ from utils.files import find_background, find_input, find_watermark_image
 from utils.i18n import t
 from utils.progress import bar
 from utils.render_queue import RenderQueueFull, enqueue_render
-from utils.auto_palette import apply_auto_palette
+from utils.auto_palette import apply_auto_palette_async
 from services import renderer
 from services import sticker_processor, tgs_processor
 
@@ -118,7 +118,7 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
     if not s["input"].get("type"):
         await message.answer(t(lang, "no_input"), parse_mode="HTML")
         return
-    if apply_auto_palette(s, find_input(uid, s)):
+    if await apply_auto_palette_async(s, find_input(uid, s)):
         state.save(uid)
     job_settings, input_path, bg_path, wm_path, snapshot_dir = _snapshot_render_job(uid, s)
     if s["input"].get("type") != "emoji" and input_path is None:

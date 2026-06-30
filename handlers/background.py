@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery
 
 from config import BACKGROUNDS_DIR, MAX_UPLOAD_MB
 from utils import state, keyboards
-from utils.auto_palette import apply_auto_palette
+from utils.auto_palette import apply_auto_palette_async
 from utils.files import find_input
 from utils.i18n import t
 from utils.messages import edit_or_answer
@@ -117,7 +117,7 @@ async def cb_style_set(call: CallbackQuery):
     style = call.data.split(":")[2]
     if style == "auto_palette":
         s["background"]["auto_palette"] = True
-        apply_auto_palette(s, find_input(uid, s))
+        await apply_auto_palette_async(s, find_input(uid, s))
         state.save(uid)
         await call.answer(t(lang, "bg_auto_palette_enabled", plain=True))
         await edit_or_answer(

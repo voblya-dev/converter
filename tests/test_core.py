@@ -108,6 +108,26 @@ class CoreChecks(unittest.TestCase):
         self.assertGreater(g, r)
         self.assertGreater(g, b)
 
+    def test_async_auto_palette_recomputes_for_each_emoji(self):
+        from utils.auto_palette import apply_auto_palette_async
+
+        async def scenario():
+            settings = self.state.reset(4242424248)
+            settings["background"]["auto_palette"] = True
+            settings["input"]["type"] = "emoji"
+            settings["input"]["emoji"] = "🔴"
+            await apply_auto_palette_async(settings, None)
+            red = settings["background"]["color"]
+            settings["input"]["emoji"] = "🟢"
+            await apply_auto_palette_async(settings, None)
+            green = settings["background"]["color"]
+            self.assertNotEqual(red, green)
+            r, g, b = tuple(int(green.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+            self.assertGreater(g, r)
+            self.assertGreater(g, b)
+
+        asyncio.run(scenario())
+
     def test_auto_colorize_does_not_use_stale_image_background_color(self):
         settings = self.state.reset(4242424244)
         settings["input"]["type"] = "emoji"

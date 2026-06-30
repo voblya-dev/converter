@@ -1,6 +1,7 @@
 """Auto-palette helpers for matching background colors to current input."""
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from utils.colors import hex_to_rgb, rgb_to_hex
@@ -57,6 +58,37 @@ def apply_auto_palette(settings: dict, src_file: Path | None = None) -> bool:
         return False
     input_settings = settings.get("input", {})
     pair = resolve_auto_palette(
+        input_settings.get("type"),
+        src_file,
+        input_settings.get("emoji"),
+    )
+    if not pair:
+        return False
+    color1, color2 = pair
+    settings["background"].update({
+        "mode": "gradient",
+        "auto_palette": True,
+        "color": color1,
+        "color2": color2,
+        "direction": "diagonal",
+    })
+    return True
+
+
+async def resolve_auto_palette_async(input_type: str | None, src_file: Path | None, emoji: str | None) -> tuple[str, str] | None:
+    colors = await asyncio.to_thread(extract_palette, input_type, src_file, emoji)
+    if not colors:
+        colors = emoji_palette_hint(emoji)
+    if not colors:
+        return None
+    return auto_palette_pair(colors)
+
+
+async def apply_auto_palette_async(settings: dict, src_file: Path | None = None) -> bool:
+    if not settings["background"].get("auto_palette"):
+        return False
+    input_settings = settings.get("input", {})
+    pair = await resolve_auto_palette_async(
         input_settings.get("type"),
         src_file,
         input_settings.get("emoji"),

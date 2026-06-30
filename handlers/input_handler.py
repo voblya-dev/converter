@@ -25,7 +25,7 @@ from utils.colors import parse_hex
 from utils.files import find_input
 from handlers.start import main_menu_text
 from handlers.render import render_for_message
-from utils.auto_palette import apply_auto_palette
+from utils.auto_palette import apply_auto_palette_async
 
 router = Router(name="input")
 
@@ -51,8 +51,8 @@ async def _telegram_file_path(bot: Bot, file_id: str) -> str:
     return f.file_path or ""
 
 
-def _apply_auto_palette(uid: int, s: dict) -> None:
-    apply_auto_palette(s, find_input(uid, s))
+async def _apply_auto_palette(uid: int, s: dict) -> None:
+    await apply_auto_palette_async(s, find_input(uid, s))
 
 
 async def _accept_premium_emoji_sticker(message: Message, bot: Bot, st) -> None:
@@ -86,7 +86,7 @@ async def _accept_premium_emoji_sticker(message: Message, bot: Bot, st) -> None:
         s["input"]["emoji"] = getattr(st, "emoji", None)
         if s["output"].get("format") == "png":
             s["output"]["format"] = "mp4"
-        _apply_auto_palette(uid, s)
+        await _apply_auto_palette(uid, s)
         state.save(uid)
         await render_for_message(message, bot, uid)
         return
@@ -141,7 +141,7 @@ async def _accept_sticker(message: Message, bot: Bot, st) -> None:
         s["output"]["format"] = "png"
     if in_type in {"tgs", "sticker_video"} and s["output"].get("format") == "png":
         s["output"]["format"] = "mp4"
-    _apply_auto_palette(uid, s)
+    await _apply_auto_palette(uid, s)
     state.save(uid)
 
     await render_for_message(message, bot, uid)
@@ -424,7 +424,7 @@ async def on_text(message: Message, bot: Bot):
         s["input"]["emoji"] = text
         s["input"]["file_id"] = None
         s["output"]["format"] = "png"
-        _apply_auto_palette(uid, s)
+        await _apply_auto_palette(uid, s)
         state.save(uid)
         await render_for_message(message, bot, uid)
         return
