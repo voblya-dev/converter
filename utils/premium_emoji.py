@@ -52,6 +52,7 @@ EMOJI_IDS: dict[str, str] = {
     "🎉": "5388674524583572460",
     "🛑": "5472030751648127392",
     "📱": "5472200252532464654",
+    "🧪": "5472221053059078763",
 }
 
 _CUSTOM_EMOJI_RE = re.compile(r"<tg-emoji\s+emoji-id=\"\d+\">.*?</tg-emoji>", re.DOTALL)

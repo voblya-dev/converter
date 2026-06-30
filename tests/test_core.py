@@ -63,6 +63,22 @@ class CoreChecks(unittest.TestCase):
         self.assertGreater(r, g)
         self.assertGreater(r, b)
 
+    def test_palette_prefers_saturated_green(self):
+        from utils.palette import _dominant_colors
+
+        img = Image.new("RGBA", (64, 64), (0, 180, 0, 255))
+        colors = _dominant_colors(img)
+        self.assertTrue(colors)
+        r, g, b = tuple(int(colors[0].lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+        self.assertGreater(g, r)
+        self.assertGreater(g, b)
+
+    def test_auto_palette_icon_is_premiumized(self):
+        from utils.i18n import t
+
+        rendered = t("ru", "preview_bg_auto_palette")
+        self.assertIn("tg-emoji", rendered)
+
     def test_empty_auto_palette_does_not_replace_background_with_gray(self):
         from handlers.input_handler import _apply_auto_palette
 
