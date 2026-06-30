@@ -77,6 +77,8 @@
   "render_cancelled": "🛑 <b>Рендер отменён.</b>",
   "render_timeout": "⏱ <b>Рендер остановлен по таймауту.</b>\n<blockquote>Попробуй снизить FPS, разрешение или выбрать MP4 вместо GIF.</blockquote>",
   "render_queue_full": "⚠️ <b>У тебя уже идёт рендер.</b>\n<blockquote>Дождись завершения или нажми отмену.</blockquote>",
+  "render_queued": "⏳ <b>Рендер в очереди</b>\n<blockquote>Твоя позиция: <code>{position}</code>. Как только предыдущий рендер завершится, этот начнётся автоматически.</blockquote>",
+  "render_queue_start": "🌀 <b>Очередь дошла до тебя. Запускаю рендер...</b>",
   "render_summary": "✅ <b>Готово</b>\n<blockquote>Формат: <code>{fmt}</code>\nРазмер: <code>{w}×{h}</code>\nFPS: <code>{fps}</code>\nДлительность: <code>{duration} сек</code>\nВес: <code>{size}</code></blockquote>",
   "no_input": "⚠️ Сначала отправь <b>стикер</b> или <b>эмодзи</b>.",
   "settings_reset": "🔄 Настройки сброшены.",

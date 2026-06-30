@@ -77,6 +77,8 @@
   "render_cancelled": "🛑 <b>Render cancelled.</b>",
   "render_timeout": "⏱ <b>Render stopped by timeout.</b>\n<blockquote>Try lower FPS/resolution or MP4 instead of GIF.</blockquote>",
   "render_queue_full": "⚠️ <b>You already have an active render.</b>\n<blockquote>Wait for it to finish or press cancel.</blockquote>",
+  "render_queued": "⏳ <b>Render queued</b>\n<blockquote>Your position: <code>{position}</code>. It will start automatically when previous renders finish.</blockquote>",
+  "render_queue_start": "🌀 <b>Your queued render is starting...</b>",
   "render_summary": "✅ <b>Done</b>\n<blockquote>Format: <code>{fmt}</code>\nSize: <code>{w}×{h}</code>\nFPS: <code>{fps}</code>\nDuration: <code>{duration}s</code>\nFile size: <code>{size}</code></blockquote>",
   "no_input": "⚠️ First send a <b>sticker</b> or <b>emoji</b>.",
   "settings_reset": "🔄 Settings reset.",

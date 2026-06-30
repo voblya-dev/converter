@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import asyncio
 from pathlib import Path
 import os
 
@@ -62,6 +63,18 @@ class CoreChecks(unittest.TestCase):
         self.assertGreater(r, g)
         self.assertGreater(r, b)
 
+    def test_empty_auto_palette_does_not_replace_background_with_gray(self):
+        from handlers.input_handler import _apply_auto_palette
+
+        settings = self.state.reset(4242424245)
+        settings["background"]["auto_palette"] = True
+        settings["background"]["color"] = "#00AA00"
+        settings["background"]["color2"] = "#006600"
+        settings["input"]["type"] = "missing"
+        _apply_auto_palette(4242424245, settings)
+        self.assertEqual(settings["background"]["color"], "#00AA00")
+        self.assertEqual(settings["background"]["color2"], "#006600")
+
     def test_auto_colorize_does_not_use_stale_image_background_color(self):
         settings = self.state.reset(4242424244)
         settings["input"]["type"] = "emoji"
@@ -82,6 +95,21 @@ class CoreChecks(unittest.TestCase):
             ]
         avg = tuple(sum(p[i] for p in pixels) / len(pixels) for i in range(3))
         self.assertGreater(avg[0], avg[2])
+
+    def test_render_queue_fifo_positions(self):
+        async def scenario():
+            from utils.render_queue import enqueue_render
+
+            uid = 989898
+            first = await enqueue_render(uid)
+            second = await enqueue_render(uid)
+            self.assertEqual(await first.position(), 1)
+            self.assertEqual(await second.position(), 2)
+            await first.release()
+            self.assertEqual(await second.position(), 1)
+            await second.release()
+
+        asyncio.run(scenario())
 
 
 if __name__ == "__main__":

@@ -32,6 +32,8 @@ def _input_info(s: dict, lang: str) -> str:
 
 def _bg_info(s: dict, lang: str) -> str:
     bg = s["background"]
+    if bg.get("auto_palette"):
+        return t(lang, "preview_bg_auto_palette")
     m = bg["mode"]
     if m == "color":
         return t(lang, "preview_bg_color", color=bg["color"])
@@ -44,8 +46,6 @@ def _bg_info(s: dict, lang: str) -> str:
         return t(lang, "preview_bg_video")
     if m == "global_image":
         return t(lang, "preview_bg_global")
-    if m == "auto_palette":
-        return t(lang, "preview_bg_auto_palette")
     return m
 
 

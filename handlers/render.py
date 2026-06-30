@@ -25,7 +25,7 @@ from utils import state, keyboards
 from utils.files import find_background, find_input, find_watermark_image
 from utils.i18n import t
 from utils.progress import bar
-from utils.render_queue import RenderQueueFull, render_slot
+from utils.render_queue import RenderQueueFull, enqueue_render
 from services import renderer
 from services import sticker_processor, tgs_processor
 
@@ -98,11 +98,40 @@ async def render_for_message(message, bot: Bot, uid: int) -> None:
         await message.answer(t(lang, "no_input"), parse_mode="HTML")
         return
 
+    queue_msg = None
     try:
-        async with render_slot(uid):
-            await _render_for_message_locked(message, bot, uid, s, lang)
+        ticket = await enqueue_render(uid)
     except RenderQueueFull:
         await message.answer(t(lang, "render_queue_full"), parse_mode="HTML")
+        return
+
+    try:
+        position = await ticket.position()
+        if position > 1:
+            queue_msg = await message.answer(
+                t(lang, "render_queued", position=position),
+                parse_mode="HTML",
+            )
+            while await ticket.position() > 1:
+                new_position = await ticket.position()
+                try:
+                    await queue_msg.edit_text(
+                        t(lang, "render_queued", position=new_position),
+                        parse_mode="HTML",
+                    )
+                except Exception:
+                    pass
+                await asyncio.sleep(2)
+            try:
+                await queue_msg.edit_text(t(lang, "render_queue_start"), parse_mode="HTML")
+            except Exception:
+                pass
+
+        await ticket.wait_until_ready()
+        async with ticket:
+            await _render_for_message_locked(message, bot, uid, s, lang)
+    finally:
+        await ticket.release()
 
 
 async def _render_for_message_locked(message, bot: Bot, uid: int, s: dict, lang: str) -> None:

@@ -64,13 +64,15 @@ def _auto_palette_pair(colors: list[str]) -> tuple[str, str]:
         luminance = 0.2126 * base[0] + 0.7152 * base[1] + 0.0722 * base[2]
         accent = _mix_rgb(base, (255, 255, 255), 0.32) if luminance < 120 else _mix_rgb(base, (0, 0, 0), 0.28)
         return colors[0], rgb_to_hex(accent)
-    return "#202124", "#3C4043"
+    raise ValueError("empty palette")
 
 
 def _apply_auto_palette(uid: int, s: dict) -> None:
     if not s["background"].get("auto_palette"):
         return
     colors = extract_palette(s["input"].get("type"), find_input(uid, s), s["input"].get("emoji"))
+    if not colors:
+        return
     color1, color2 = _auto_palette_pair(colors)
     s["background"].update({
         "mode": "gradient",
