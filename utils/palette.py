@@ -62,13 +62,17 @@ def _dominant_colors_from_paths(paths: list[Path], limit: int = 3) -> list[str]:
     return colors
 
 
-def _normalize_lottie_rgb(values: list[float | int]) -> tuple[int, int, int] | None:
+def _normalize_lottie_rgb(values: list) -> tuple[int, int, int] | None:
     if len(values) < 3:
         return None
     rgb = list(values[:3])
-    if all(0 <= float(c) <= 1 for c in rgb):
-        rgb = [float(c) * 255 for c in rgb]
-    result = tuple(max(0, min(255, int(round(float(c))))) for c in rgb)
+    try:
+        numeric = [float(c) for c in rgb]
+    except (TypeError, ValueError):
+        return None
+    if all(0 <= c <= 1 for c in numeric):
+        numeric = [c * 255 for c in numeric]
+    result = tuple(max(0, min(255, int(round(c)))) for c in numeric)
     r, g, b = result
     if r > 245 and g > 245 and b > 245:
         return None
@@ -77,20 +81,57 @@ def _normalize_lottie_rgb(values: list[float | int]) -> tuple[int, int, int] | N
     return result
 
 
+def _looks_like_rgb(values: list) -> bool:
+    if len(values) < 3:
+        return False
+    try:
+        rgb = [float(c) for c in values[:3]]
+    except (TypeError, ValueError):
+        return False
+    return all(0 <= c <= 1 for c in rgb) or all(0 <= c <= 255 for c in rgb)
+
+
+def _color_candidates(value) -> list[tuple[int, int, int]]:
+    colors: list[tuple[int, int, int]] = []
+    if isinstance(value, list):
+        if _looks_like_rgb(value):
+            rgb = _normalize_lottie_rgb(value)
+            if rgb:
+                colors.append(rgb)
+        for item in value:
+            colors.extend(_color_candidates(item))
+    elif isinstance(value, dict):
+        for key in ("k", "s", "e"):
+            if key in value:
+                colors.extend(_color_candidates(value[key]))
+    return colors
+
+
+def _normalize_lottie_gradient_stops(values: list) -> list[tuple[int, int, int]]:
+    colors: list[tuple[int, int, int]] = []
+    if not values:
+        return colors
+    if all(isinstance(v, (int, float)) for v in values):
+        # Lottie gradient format: offset, r, g, b, offset, r, g, b...
+        for i in range(0, len(values) - 3, 4):
+            rgb = _normalize_lottie_rgb(values[i + 1:i + 4])
+            if rgb:
+                colors.append(rgb)
+        return colors
+    for item in values:
+        colors.extend(_color_candidates(item))
+    return colors
+
+
 def _lottie_color_values(node) -> list[tuple[int, int, int]]:
     colors: list[tuple[int, int, int]] = []
     if isinstance(node, dict):
         if node.get("ty") in {"fl", "st"}:
-            rgb = _normalize_lottie_rgb(((node.get("c") or {}).get("k") or []))
-            if rgb:
-                colors.append(rgb)
+            colors.extend(_color_candidates((node.get("c") or {}).get("k") or []))
         if node.get("ty") == "gf":
             stops = (((node.get("g") or {}).get("k") or {}).get("k") or [])
             if isinstance(stops, list):
-                for i in range(0, len(stops) - 3, 4):
-                    rgb = _normalize_lottie_rgb(stops[i + 1:i + 4])
-                    if rgb:
-                        colors.append(rgb)
+                colors.extend(_normalize_lottie_gradient_stops(stops))
         for value in node.values():
             colors.extend(_lottie_color_values(value))
     elif isinstance(node, list):
